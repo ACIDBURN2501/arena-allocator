@@ -24,37 +24,39 @@
  *********************************************************************/
 
 #include "arena.h"
-#include <stdbool.h>
-#include <string.h> /**/
 #include <limits.h>
+#include <stdbool.h>
+#include <string.h>
 _Static_assert(CHAR_BIT == 8, "Arena allocator requires an 8-bit byte");
 
 /* ------------------------------------------------------------------ */
-/*   COMPILE-TIME VALIDATION                                              */
+/*   COMPILE-TIME VALIDATION                                          */
 /* ------------------------------------------------------------------ */
 
 /* Ensure ARENA_CFG_DEFAULT_ALIGNMENT is a power of two */
-_Static_assert((ARENA_CFG_DEFAULT_ALIGNMENT != 0U) &&
-               ((ARENA_CFG_DEFAULT_ALIGNMENT & (ARENA_CFG_DEFAULT_ALIGNMENT - 1U)) == 0U),
+_Static_assert((ARENA_CFG_DEFAULT_ALIGNMENT != 0U)
+                   && ((ARENA_CFG_DEFAULT_ALIGNMENT
+                        & (ARENA_CFG_DEFAULT_ALIGNMENT - 1U))
+                       == 0U),
                "ARENA_CFG_DEFAULT_ALIGNMENT must be a power of two");
 
 /* ------------------------------------------------------------------ */
-/*   INTERNAL OPAQUE STRUCT DEFINITION                                 */
+/*   INTERNAL OPAQUE STRUCT DEFINITION                                */
 /* ------------------------------------------------------------------ */
 #ifndef TEST_BUILD
 struct arena_s {
-        uint8_t *start;    /**< Pointer to the start of the backing buffer   */
-        uint8_t *current;  /**< Bump pointer (next free byte)                */
-        uint8_t *end;      /**< One past the last valid byte of the buffer    */
-        size_t high_water; /**< Highest ever value of used                   */
+        uint8_t *start;    /**< Pointer to the start of the backing buffer  */
+        uint8_t *current;  /**< Bump pointer (next free byte)               */
+        uint8_t *end;      /**< One past the last valid byte of the buffer  */
+        size_t high_water; /**< Highest ever value of used                  */
 #if (ARENA_CFG_DEBUG_POISON != 0)
-        uint8_t poison; /**< Debug fill byte (default 0xAA)                */
+        uint8_t poison; /**< Debug fill byte (default 0xAA)                 */
 #endif
 };
 #endif /* TEST_BUILD */
 
 /* ------------------------------------------------------------------ */
-/*   STATIC INLINE HELPERS (MISRA-friendly)                            */
+/*   STATIC INLINE HELPERS                                             */
 /* ------------------------------------------------------------------ */
 
 /**
@@ -89,7 +91,8 @@ align_up(const uintptr_t address, const size_t alignment)
 {
         const uintptr_t mask = ((uintptr_t)alignment) - 1U;
         if (address > (UINTPTR_MAX - mask)) {
-                return UINTPTR_MAX; /* sentinel: caller's bounds check will reject it */
+                return UINTPTR_MAX; /* sentinel: caller's bounds check will
+                                       reject it */
         }
         return (address + mask) & (~mask);
 }
@@ -121,7 +124,7 @@ arena_fill(void *const start, const size_t size, const uint8_t pattern)
 }
 
 /* ------------------------------------------------------------------ */
-/*   PUBLIC API IMPLEMENTATION                                          */
+/*   PUBLIC API IMPLEMENTATION                                        */
 /* ------------------------------------------------------------------ */
 
 arena_status_t
@@ -152,9 +155,9 @@ arena_init(arena_t *const arena, void *const buffer, const size_t size)
         return ARENA_STATUS_OK;
 }
 
-/* --------------------------------------------------------------- */
 arena_status_t
-arena_alloc(arena_t *const arena, void **const result, const size_t size, size_t alignment)
+arena_alloc(arena_t *const arena, void **const result, const size_t size,
+            size_t alignment)
 {
         uintptr_t aligned_addr;
         uintptr_t cur_addr;
@@ -188,7 +191,8 @@ arena_alloc(arena_t *const arena, void **const result, const size_t size, size_t
         if (aligned_addr >= (uintptr_t)arena->end) {
                 return ARENA_STATUS_OUT_OF_MEMORY;
         }
-        /* 2. Remaining space must fit the requested size (no wrap, since aligned_addr < end) */
+        /* 2. Remaining space must fit the requested size (no wrap, since
+         * aligned_addr < end) */
         if (size > ((uintptr_t)arena->end - aligned_addr)) {
                 return ARENA_STATUS_OUT_OF_MEMORY;
         }
@@ -207,7 +211,6 @@ arena_alloc(arena_t *const arena, void **const result, const size_t size, size_t
         return ARENA_STATUS_OK;
 }
 
-/* --------------------------------------------------------------- */
 arena_marker_t
 arena_get_marker(const arena_t *const arena)
 {
@@ -218,7 +221,6 @@ arena_get_marker(const arena_t *const arena)
         return marker;
 }
 
-/* --------------------------------------------------------------- */
 void
 arena_rewind(arena_t *const arena, const arena_marker_t marker)
 {
@@ -239,7 +241,6 @@ arena_rewind(arena_t *const arena, const arena_marker_t marker)
         }
 }
 
-/* --------------------------------------------------------------- */
 void
 arena_reset(arena_t *const arena)
 {
@@ -255,21 +256,18 @@ arena_reset(arena_t *const arena)
 #endif
 }
 
-/* --------------------------------------------------------------- */
 size_t
 arena_get_used(const arena_t *const arena)
 {
         return (arena != NULL) ? (size_t)(arena->current - arena->start) : 0U;
 }
 
-/* --------------------------------------------------------------- */
 size_t
 arena_get_high_water(const arena_t *const arena)
 {
         return (arena != NULL) ? arena->high_water : 0U;
 }
 
-/* --------------------------------------------------------------- */
 size_t
 arena_get_capacity(const arena_t *const arena)
 {
@@ -279,5 +277,3 @@ arena_get_capacity(const arena_t *const arena)
         }
         return capacity;
 }
-
-/* End of arena.c */
