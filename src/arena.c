@@ -24,7 +24,8 @@
  *********************************************************************/
 
 #include "arena.h"
-#include <string.h> /* memset (optional, only used when debug poisoning is enabled) */
+#include <stdbool.h>
+#include <string.h> /**/
 
 /* ------------------------------------------------------------------ */
 /*   INTERNAL OPAQUE STRUCT DEFINITION                                 */
@@ -143,9 +144,7 @@ void *
 arena_alloc(arena_t *const arena, const size_t size, size_t alignment)
 {
         uintptr_t aligned_addr;
-        size_t padding;
         uintptr_t cur_addr;
-        uintptr_t end_addr;
 
         /* Defensive checks - return NULL to signal failure */
         if (arena == NULL) {
@@ -167,7 +166,6 @@ arena_alloc(arena_t *const arena, const size_t size, size_t alignment)
 
         cur_addr = (uintptr_t)arena->current;
         aligned_addr = align_up(cur_addr, alignment);
-        padding = aligned_addr - cur_addr;
 
         /* Check for overflow of the address range */
         if ((aligned_addr + size) > (uintptr_t)arena->end) {

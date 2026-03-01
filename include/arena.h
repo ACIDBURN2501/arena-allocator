@@ -13,8 +13,7 @@
  *
  *********************************************************************/
 
-#ifndef ARENA_H_
-#define ARENA_H_
+#pragma once
 
 /* ------------------------------------------------------------------ */
 /*   INCLUDES                                                         */
@@ -41,7 +40,22 @@
  * The structure is defined in arena.c and must not be accessed
  * directly by user code.
  */
+#ifndef TEST_BUILD
 typedef struct arena_s arena_t;
+#else
+
+struct arena_s {
+        uint8_t *start;
+        uint8_t *current;
+        uint8_t *end;
+        size_t used;
+        size_t high_water;
+#if (ARENA_CFG_DEBUG_POISON != 0)
+        uint8_t poison;
+#endif
+};
+typedef struct arena_s arena_t;
+#endif
 
 /**
  * @brief Marker used to remember an arena position (checkpoint).
@@ -182,5 +196,3 @@ extern size_t arena_get_capacity(const arena_t *arena);
 /**
  * @}
  */  /* end of group arena */
-
-#endif /* ARENA_H_ */
