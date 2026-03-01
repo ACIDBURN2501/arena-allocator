@@ -1,5 +1,5 @@
 /*********************************************************************
- * @file arena_demo.c
+ * @file test_arena.c
  * @brief Minimal demonstration of the arena allocator.
  *
  * Compile (e.g. with GCC):
@@ -26,6 +26,9 @@ static bool test_invalid_alignment(void);
 static bool test_zero_size_allocation(void);
 static bool test_null_pointers(void);
 static bool test_alignment_boundaries(void);
+static bool test_invalid_argument(void);
+static bool test_alloc_exact_capacity(void);
+static bool test_get_used_transitions(void);
 
 static bool test_invalid_alignment(void)
 {
@@ -84,8 +87,8 @@ static bool test_zero_size_allocation(void)
 
         /* Test zero size allocation */
         st = arena_alloc(&arena, &ptr, 0U, 0U);
-        if (st != ARENA_STATUS_OUT_OF_MEMORY) {
-                printf("FAIL: Expected ARENA_STATUS_OUT_OF_MEMORY for size=0, got %d\n", st);
+        if (st != ARENA_STATUS_INVALID_ARGUMENT) {
+                printf("FAIL: Expected ARENA_STATUS_INVALID_ARGUMENT for size=0, got %d\n", st);
                 passed = false;
         }
 
@@ -198,6 +201,204 @@ static bool test_alignment_boundaries(void)
         return passed;
 }
 
+/* ------------------------------------------------------------------ */
+/*   REGRESSION TESTS                                                   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * @brief Verify ARENA_STATUS_INVALID_ARGUMENT is returned for zero-size
+ *        arguments and that guard ordering is correct.
+ */
+static bool
+test_invalid_argument(void)
+{
+        static uint8_t buffer[DEMO_BUF_SIZE];
+        arena_t arena;
+        arena_status_t st;
+        void *ptr;
+        bool passed = true;
+
+        st = arena_init(&arena, buffer, sizeof(buffer));
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: arena_init failed in test_invalid_argument\n");
+                return false;
+        }
+
+        /* arena_init with size == 0 */
+        st = arena_init(&arena, buffer, 0U);
+        if (st != ARENA_STATUS_INVALID_ARGUMENT) {
+                printf("FAIL: Expected INVALID_ARGUMENT for arena_init size=0, got %d\n", st);
+                passed = false;
+        }
+
+        /* Re-init for subsequent alloc tests */
+        (void)arena_init(&arena, buffer, sizeof(buffer));
+
+        /* alignment=0 resolves to default (valid), size=0 → INVALID_ARGUMENT */
+        st = arena_alloc(&arena, &ptr, 0U, 0U);
+        if (st != ARENA_STATUS_INVALID_ARGUMENT) {
+                printf("FAIL: Expected INVALID_ARGUMENT for alloc size=0 align=0, got %d\n", st);
+                passed = false;
+        }
+
+        /* alignment=3 (invalid) checked before size=0: must return INVALID_ALIGNMENT */
+        st = arena_alloc(&arena, &ptr, 0U, 3U);
+        if (st != ARENA_STATUS_INVALID_ALIGNMENT) {
+                printf("FAIL: Expected INVALID_ALIGNMENT for align=3 size=0, got %d\n", st);
+                passed = false;
+        }
+
+        /* alignment=8 (valid), size=0 → INVALID_ARGUMENT */
+        st = arena_alloc(&arena, &ptr, 0U, 8U);
+        if (st != ARENA_STATUS_INVALID_ARGUMENT) {
+                printf("FAIL: Expected INVALID_ARGUMENT for align=8 size=0, got %d\n", st);
+                passed = false;
+        }
+
+        if (passed) {
+                printf("PASS: test_invalid_argument\n");
+        }
+        return passed;
+}
+
+/**
+ * @brief Verify that allocating exactly the arena capacity succeeds and
+ *        one further byte is rejected.
+ */
+static bool
+test_alloc_exact_capacity(void)
+{
+        static uint8_t buffer[DEMO_BUF_SIZE];
+        arena_t arena;
+        arena_status_t st;
+        void *ptr;
+        bool passed = true;
+
+        /* Use alignment=1 so there is zero padding */
+        st = arena_init(&arena, buffer, sizeof(buffer));
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: arena_init failed in test_alloc_exact_capacity\n");
+                return false;
+        }
+
+        /* Allocate exactly the full capacity in one shot */
+        st = arena_alloc(&arena, &ptr, sizeof(buffer), 1U);
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: Exact-capacity alloc returned %d\n", st);
+                passed = false;
+        }
+
+        /* One more byte must fail */
+        st = arena_alloc(&arena, &ptr, 1U, 1U);
+        if (st != ARENA_STATUS_OUT_OF_MEMORY) {
+                printf("FAIL: Expected OUT_OF_MEMORY after full alloc, got %d\n", st);
+                passed = false;
+        }
+
+        /* Fill via repeated 1-byte allocations and verify we reach the end */
+        (void)arena_init(&arena, buffer, sizeof(buffer));
+        {
+                size_t i;
+                for (i = 0U; i < sizeof(buffer); ++i) {
+                        st = arena_alloc(&arena, &ptr, 1U, 1U);
+                        if (st != ARENA_STATUS_OK) {
+                                printf("FAIL: 1-byte alloc %zu failed\n", i);
+                                passed = false;
+                                break;
+                        }
+                }
+        }
+        if (arena_get_used(&arena) != sizeof(buffer)) {
+                printf("FAIL: Expected used=%zu after filling, got %zu\n",
+                       sizeof(buffer), arena_get_used(&arena));
+                passed = false;
+        }
+        st = arena_alloc(&arena, &ptr, 1U, 1U);
+        if (st != ARENA_STATUS_OUT_OF_MEMORY) {
+                printf("FAIL: Expected OUT_OF_MEMORY at end of filled arena, got %d\n", st);
+                passed = false;
+        }
+
+        if (passed) {
+                printf("PASS: test_alloc_exact_capacity\n");
+        }
+        return passed;
+}
+
+/**
+ * @brief Verify arena_get_used returns the correct value through
+ *        alloc → rewind → reset transitions.
+ */
+static bool
+test_get_used_transitions(void)
+{
+        static uint8_t buffer[DEMO_BUF_SIZE];
+        arena_t arena;
+        arena_status_t st;
+        void *ptr;
+        arena_marker_t mk;
+        bool passed = true;
+
+        st = arena_init(&arena, buffer, sizeof(buffer));
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: arena_init failed in test_get_used_transitions\n");
+                return false;
+        }
+
+        /* Initially used = 0 */
+        if (arena_get_used(&arena) != 0U) {
+                printf("FAIL: Expected used=0 after init, got %zu\n",
+                       arena_get_used(&arena));
+                passed = false;
+        }
+
+        /* After 16-byte alloc (align=1) used = 16 */
+        st = arena_alloc(&arena, &ptr, 16U, 1U);
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: alloc(16) failed\n");
+                passed = false;
+        }
+        if (arena_get_used(&arena) != 16U) {
+                printf("FAIL: Expected used=16 after alloc(16), got %zu\n",
+                       arena_get_used(&arena));
+                passed = false;
+        }
+
+        /* Save marker, allocate another 8 bytes */
+        mk = arena_get_marker(&arena);
+        st = arena_alloc(&arena, &ptr, 8U, 1U);
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: alloc(8) failed\n");
+                passed = false;
+        }
+        if (arena_get_used(&arena) != 24U) {
+                printf("FAIL: Expected used=24 after alloc(8), got %zu\n",
+                       arena_get_used(&arena));
+                passed = false;
+        }
+
+        /* Rewind to marker: used goes back to 16 */
+        arena_rewind(&arena, mk);
+        if (arena_get_used(&arena) != 16U) {
+                printf("FAIL: Expected used=16 after rewind, got %zu\n",
+                       arena_get_used(&arena));
+                passed = false;
+        }
+
+        /* Reset: used goes to 0 */
+        arena_reset(&arena);
+        if (arena_get_used(&arena) != 0U) {
+                printf("FAIL: Expected used=0 after reset, got %zu\n",
+                       arena_get_used(&arena));
+                passed = false;
+        }
+
+        if (passed) {
+                printf("PASS: test_get_used_transitions\n");
+        }
+        return passed;
+}
+
 int
 main(void)
 {
@@ -214,6 +415,9 @@ main(void)
         all_passed = test_zero_size_allocation() && all_passed;
         all_passed = test_null_pointers() && all_passed;
         all_passed = test_alignment_boundaries() && all_passed;
+        all_passed = test_invalid_argument() && all_passed;
+        all_passed = test_alloc_exact_capacity() && all_passed;
+        all_passed = test_get_used_transitions() && all_passed;
 
         if (!all_passed) {
                 printf("Some tests failed!\n");

@@ -116,13 +116,27 @@ meson test -C build
 
 ## API Reference
 
+### Status codes
+
+All functions that can fail return an `arena_status_t`:
+
+| Value | Name | Meaning |
+|---|---|---|
+| `0` | `ARENA_STATUS_OK` | Operation succeeded |
+| `1` | `ARENA_STATUS_NULL_POINTER` | A required pointer argument was NULL |
+| `2` | `ARENA_STATUS_OUT_OF_MEMORY` | Not enough space left in the arena |
+| `3` | `ARENA_STATUS_INVALID_ALIGNMENT` | Alignment is non-zero and not a power of two |
+| `4` | `ARENA_STATUS_INVALID_ARGUMENT` | `size` or buffer length argument is zero |
+
 ### Initialization
 
 ```c
 arena_status_t arena_init(arena_t *arena, void *buffer, size_t size);
 ```
 
-Initialize an arena with a backing buffer. The buffer must remain valid for the arena's lifetime.
+Initialize an arena with a backing buffer. The buffer must remain valid for the
+arena's lifetime. Returns `ARENA_STATUS_INVALID_ARGUMENT` if `size` is zero,
+`ARENA_STATUS_NULL_POINTER` if either pointer is NULL.
 
 ### Allocation
 
@@ -130,7 +144,11 @@ Initialize an arena with a backing buffer. The buffer must remain valid for the 
 arena_status_t arena_alloc(arena_t *arena, void **result, size_t size, size_t alignment);
 ```
 
-Allocate memory with optional alignment. Returns `ARENA_STATUS_OK` on success.
+Allocate `size` bytes with the requested alignment. Pass `alignment = 0` to use
+the default (`ARENA_CFG_DEFAULT_ALIGNMENT`, 8 bytes). Returns
+`ARENA_STATUS_INVALID_ARGUMENT` if `size` is zero,
+`ARENA_STATUS_INVALID_ALIGNMENT` if `alignment` is non-zero and not a power of
+two, or `ARENA_STATUS_OUT_OF_MEMORY` if the arena is full.
 
 ### Checkpointing
 

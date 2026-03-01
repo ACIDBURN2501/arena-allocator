@@ -48,7 +48,6 @@ struct arena_s {
         uint8_t *start;
         uint8_t *current;
         uint8_t *end;
-        size_t used;
         size_t high_water;
 #if (ARENA_CFG_DEBUG_POISON != 0)
         uint8_t poison;
@@ -80,7 +79,9 @@ typedef enum {
         ARENA_STATUS_OUT_OF_MEMORY =
             2, /**< Not enough space left in the arena */
         ARENA_STATUS_INVALID_ALIGNMENT =
-            3 /**< Alignment is not a power of two or is zero */
+            3, /**< Alignment is not a power of two or is zero */
+        ARENA_STATUS_INVALID_ARGUMENT =
+            4 /**< size or buffer length is zero */
 } arena_status_t;
 
 /* ------------------------------------------------------------------ */
@@ -98,7 +99,9 @@ typedef enum {
  * @param[in]     buffer  Pointer to the raw memory buffer (must not be NULL)
  * @param[in]     size    Size of the buffer in bytes (must be > 0)
  *
- * @return ARENA_STATUS_OK on success, otherwise a non-zero @ref arena_status_t.
+ * @retval ARENA_STATUS_OK               Initialisation succeeded.
+ * @retval ARENA_STATUS_NULL_POINTER     @p arena or @p buffer is NULL.
+ * @retval ARENA_STATUS_INVALID_ARGUMENT @p size is zero.
  *
  * @pre arena != NULL
  * @pre buffer != NULL
@@ -122,7 +125,11 @@ extern arena_status_t arena_init(arena_t *arena, void *buffer, size_t size);
  * @param[in]     alignment  Desired alignment in bytes (must be a power of two,
  *                           0 means default alignment)
  *
- * @return ARENA_STATUS_OK on success, otherwise a non-zero @ref arena_status_t.
+ * @retval ARENA_STATUS_OK               Allocation succeeded; @p *result is valid.
+ * @retval ARENA_STATUS_NULL_POINTER     @p arena or @p result is NULL.
+ * @retval ARENA_STATUS_INVALID_ALIGNMENT @p alignment is non-zero and not a power of two.
+ * @retval ARENA_STATUS_INVALID_ARGUMENT @p size is zero.
+ * @retval ARENA_STATUS_OUT_OF_MEMORY    Insufficient contiguous space remains.
  *
  * @pre arena != NULL
  * @pre result != NULL

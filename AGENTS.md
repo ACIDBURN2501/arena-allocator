@@ -26,9 +26,9 @@ meson test -C build --verbose
 
 #### Notes
 
-- `meson setup` generates `lru_cache_version.h` into the **build directory**
-  (not the source tree) via `configure_file`.
-- Header install path: `<prefix>/include/lru_cache/lru_cache.h`.
+- `meson setup` writes build metadata into the **build directory**; the source
+  tree is not modified.
+- Installed header path: `<prefix>/include/arena.h`.
 
 ---
 
