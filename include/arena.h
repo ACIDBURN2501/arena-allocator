@@ -19,9 +19,9 @@
 /* ------------------------------------------------------------------ */
 /*   INCLUDES                                                         */
 /* ------------------------------------------------------------------ */
-#include <stddef.h>   /* size_t, NULL   */
-#include <stdint.h>   /* uintptr_t      */
 #include "arena_cfg.h"
+#include <stddef.h> /* size_t, NULL   */
+#include <stdint.h> /* uintptr_t      */
 
 /* ------------------------------------------------------------------ */
 /*   Doxygen group                                                    */
@@ -60,10 +60,13 @@ typedef size_t arena_marker_t;
  * All public functions returning a status use this enumeration.
  */
 typedef enum {
-    ARENA_STATUS_OK = 0,               /**< Operation completed successfully */
-    ARENA_STATUS_NULL_POINTER = 1,    /**< A required pointer argument was NULL */
-    ARENA_STATUS_OUT_OF_MEMORY = 2,   /**< Not enough space left in the arena */
-    ARENA_STATUS_INVALID_ALIGNMENT = 3/**< Alignment is not a power of two or is zero */
+        ARENA_STATUS_OK = 0, /**< Operation completed successfully */
+        ARENA_STATUS_NULL_POINTER =
+            1, /**< A required pointer argument was NULL */
+        ARENA_STATUS_OUT_OF_MEMORY =
+            2, /**< Not enough space left in the arena */
+        ARENA_STATUS_INVALID_ALIGNMENT =
+            3 /**< Alignment is not a power of two or is zero */
 } arena_status_t;
 
 /* ------------------------------------------------------------------ */
@@ -85,7 +88,7 @@ typedef enum {
  *
  * @post The arena is ready for allocations.  Its used size is 0.
  */
-extern arena_status_t arena_init(arena_t * arena, void * buffer, size_t size);
+extern arena_status_t arena_init(arena_t *arena, void *buffer, size_t size);
 
 /**
  * @brief Allocate a block of memory from the arena.
@@ -94,7 +97,8 @@ extern arena_status_t arena_init(arena_t * arena, void * buffer, size_t size);
  * requested alignment.  If @p alignment is 0 the default alignment
  * ( @ref ARENA_CFG_DEFAULT_ALIGNMENT ) is used.
  *
- * @param[in,out] arena      Pointer to an already initialised arena (must not be NULL)
+ * @param[in,out] arena      Pointer to an already initialised arena (must not
+ * be NULL)
  * @param[in]     size       Number of bytes to allocate (must be > 0)
  * @param[in]     alignment  Desired alignment in bytes (must be a power of two,
  *                           0 means default alignment)
@@ -104,7 +108,7 @@ extern arena_status_t arena_init(arena_t * arena, void * buffer, size_t size);
  *
  * @note The caller must never free the returned pointer individually.
  */
-extern void * arena_alloc(arena_t * arena, size_t size, size_t alignment);
+extern void *arena_alloc(arena_t *arena, size_t size, size_t alignment);
 
 /**
  * @brief Store the current arena position for later rewinding.
@@ -116,7 +120,7 @@ extern void * arena_alloc(arena_t * arena, size_t size, size_t alignment);
  *
  * @return Marker representing the current offset.
  */
-extern arena_marker_t arena_get_marker(const arena_t * arena);
+extern arena_marker_t arena_get_marker(const arena_t *arena);
 
 /**
  * @brief Rewind the arena to a previously saved marker.
@@ -130,7 +134,7 @@ extern arena_marker_t arena_get_marker(const arena_t * arena);
  *
  * @post The arena used size is equal to the supplied marker.
  */
-extern void arena_rewind(arena_t * arena, arena_marker_t marker);
+extern void arena_rewind(arena_t *arena, arena_marker_t marker);
 
 /**
  * @brief Reset the arena to its initial empty state.
@@ -143,7 +147,7 @@ extern void arena_rewind(arena_t * arena, arena_marker_t marker);
  *
  * @post Used size of the arena is 0.
  */
-extern void arena_reset(arena_t * arena);
+extern void arena_reset(arena_t *arena);
 
 /**
  * @brief Query the amount of memory currently used.
@@ -152,7 +156,7 @@ extern void arena_reset(arena_t * arena);
  *
  * @return Number of bytes allocated since the last reset (or init).
  */
-extern size_t arena_get_used(const arena_t * arena);
+extern size_t arena_get_used(const arena_t *arena);
 
 /**
  * @brief Query the high-water mark (maximum ever used) for the arena.
@@ -164,7 +168,7 @@ extern size_t arena_get_used(const arena_t * arena);
  *
  * @return Highest number of bytes used by the arena at any point.
  */
-extern size_t arena_get_high_water(const arena_t * arena);
+extern size_t arena_get_high_water(const arena_t *arena);
 
 /**
  * @brief Query the total capacity of the arena.
@@ -173,7 +177,7 @@ extern size_t arena_get_high_water(const arena_t * arena);
  *
  * @return Total size (in bytes) of the backing buffer.
  */
-extern size_t arena_get_capacity(const arena_t * arena);
+extern size_t arena_get_capacity(const arena_t *arena);
 
 /**
  * @}

@@ -20,7 +20,7 @@
  * Must be a power of two and at least 1.
  */
 #ifndef ARENA_CFG_DEFAULT_ALIGNMENT
-#define ARENA_CFG_DEFAULT_ALIGNMENT  (8U)   /**< Reasonable default for 32/64 bit CPUs */
+#define ARENA_CFG_DEFAULT_ALIGNMENT (8U)
 #endif
 
 /**
@@ -31,7 +31,7 @@
  *        production builds.
  */
 #ifndef ARENA_CFG_DEBUG_POISON
-#define ARENA_CFG_DEBUG_POISON        (0U)
+#define ARENA_CFG_DEBUG_POISON (0U)
 #endif
 
 /**
@@ -39,7 +39,7 @@
  * @brief Byte pattern used when @ref ARENA_CFG_DEBUG_POISON is enabled.
  */
 #ifndef ARENA_CFG_POISON_PATTERN
-#define ARENA_CFG_POISON_PATTERN      (0xAAU)
+#define ARENA_CFG_POISON_PATTERN (0xAAU)
 #endif
 
 #endif /* ARENA_CFG_H_ */
