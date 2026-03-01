@@ -100,6 +100,10 @@ typedef enum {
  *
  * @return ARENA_STATUS_OK on success, otherwise a non-zero @ref arena_status_t.
  *
+ * @pre arena != NULL
+ * @pre buffer != NULL
+ * @pre size > 0
+ *
  * @post The arena is ready for allocations.  Its used size is 0.
  */
 extern arena_status_t arena_init(arena_t *arena, void *buffer, size_t size);
@@ -113,16 +117,24 @@ extern arena_status_t arena_init(arena_t *arena, void *buffer, size_t size);
  *
  * @param[in,out] arena      Pointer to an already initialised arena (must not
  * be NULL)
+ * @param[out]    result     Pointer to store the allocated memory address
  * @param[in]     size       Number of bytes to allocate (must be > 0)
  * @param[in]     alignment  Desired alignment in bytes (must be a power of two,
  *                           0 means default alignment)
  *
- * @return Pointer to the allocated memory or NULL if the arena does not have
- *         enough free space or if the arguments are invalid.
+ * @return ARENA_STATUS_OK on success, otherwise a non-zero @ref arena_status_t.
+ *
+ * @pre arena != NULL
+ * @pre result != NULL
+ * @pre size > 0
+ * @pre alignment == 0 || is_power_of_two(alignment)
+ *
+ * @post If successful, *result points to allocated memory
+ * @post The arena used size is increased by the allocated size
  *
  * @note The caller must never free the returned pointer individually.
  */
-extern void *arena_alloc(arena_t *arena, size_t size, size_t alignment);
+extern arena_status_t arena_alloc(arena_t *arena, void **result, size_t size, size_t alignment);
 
 /**
  * @brief Store the current arena position for later rewinding.
@@ -133,6 +145,10 @@ extern void *arena_alloc(arena_t *arena, size_t size, size_t alignment);
  * @param[in] arena  Pointer to a valid arena (must not be NULL)
  *
  * @return Marker representing the current offset.
+ *
+ * @pre arena != NULL
+ *
+ * @post Returned marker is valid for use with arena_rewind()
  */
 extern arena_marker_t arena_get_marker(const arena_t *arena);
 
@@ -146,7 +162,9 @@ extern arena_marker_t arena_get_marker(const arena_t *arena);
  * @param[in,out] arena  Pointer to an arena (must not be NULL)
  * @param[in]     marker Marker obtained from arena_get_marker().
  *
- * @post The arena used size is equal to the supplied marker.
+ * @pre arena != NULL
+ *
+ * @post The arena used size is equal to the supplied marker (if marker was valid)
  */
 extern void arena_rewind(arena_t *arena, arena_marker_t marker);
 
@@ -159,6 +177,8 @@ extern void arena_rewind(arena_t *arena, arena_marker_t marker);
  *
  * @param[in,out] arena  Pointer to an arena (must not be NULL)
  *
+ * @pre arena != NULL
+ *
  * @post Used size of the arena is 0.
  */
 extern void arena_reset(arena_t *arena);
@@ -169,6 +189,8 @@ extern void arena_reset(arena_t *arena);
  * @param[in] arena  Pointer to a valid arena (must not be NULL)
  *
  * @return Number of bytes allocated since the last reset (or init).
+ *
+ * @pre arena != NULL
  */
 extern size_t arena_get_used(const arena_t *arena);
 
@@ -181,6 +203,8 @@ extern size_t arena_get_used(const arena_t *arena);
  * @param[in] arena  Pointer to a valid arena (must not be NULL)
  *
  * @return Highest number of bytes used by the arena at any point.
+ *
+ * @pre arena != NULL
  */
 extern size_t arena_get_high_water(const arena_t *arena);
 
@@ -190,6 +214,8 @@ extern size_t arena_get_high_water(const arena_t *arena);
  * @param[in] arena  Pointer to a valid arena (must not be NULL)
  *
  * @return Total size (in bytes) of the backing buffer.
+ *
+ * @pre arena != NULL
  */
 extern size_t arena_get_capacity(const arena_t *arena);
 

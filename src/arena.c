@@ -26,6 +26,17 @@
 #include "arena.h"
 #include <stdbool.h>
 #include <string.h> /**/
+#include <limits.h>
+_Static_assert(CHAR_BIT == 8, "Arena allocator requires an 8-bit byte");
+
+/* ------------------------------------------------------------------ */
+/*   COMPILE-TIME VALIDATION                                              */
+/* ------------------------------------------------------------------ */
+
+/* Ensure ARENA_CFG_DEFAULT_ALIGNMENT is a power of two */
+_Static_assert((ARENA_CFG_DEFAULT_ALIGNMENT != 0U) && 
+               ((ARENA_CFG_DEFAULT_ALIGNMENT & (ARENA_CFG_DEFAULT_ALIGNMENT - 1U)) == 0U),
+               "ARENA_CFG_DEFAULT_ALIGNMENT must be a power of two");
 
 /* ------------------------------------------------------------------ */
 /*   INTERNAL OPAQUE STRUCT DEFINITION                                 */
@@ -140,18 +151,21 @@ arena_init(arena_t *const arena, void *const buffer, const size_t size)
 }
 
 /* --------------------------------------------------------------- */
-void *
-arena_alloc(arena_t *const arena, const size_t size, size_t alignment)
+arena_status_t
+arena_alloc(arena_t *const arena, void **const result, const size_t size, size_t alignment)
 {
         uintptr_t aligned_addr;
         uintptr_t cur_addr;
 
-        /* Defensive checks - return NULL to signal failure */
+        /* Defensive checks */
         if (arena == NULL) {
-                return NULL;
+                return ARENA_STATUS_NULL_POINTER;
+        }
+        if (result == NULL) {
+                return ARENA_STATUS_NULL_POINTER;
         }
         if (size == 0U) {
-                return NULL;
+                return ARENA_STATUS_OUT_OF_MEMORY;
         }
 
         /* Resolve default alignment if caller passes 0 */
@@ -159,9 +173,9 @@ arena_alloc(arena_t *const arena, const size_t size, size_t alignment)
                 alignment = ARENA_CFG_DEFAULT_ALIGNMENT;
         }
 
-        /* Alignment must be a power of two (MISRA rule 10.5: explicit cast) */
+        /* Alignment must be a power of two */
         if (!is_power_of_two(alignment)) {
-                return NULL;
+                return ARENA_STATUS_INVALID_ALIGNMENT;
         }
 
         cur_addr = (uintptr_t)arena->current;
@@ -170,7 +184,7 @@ arena_alloc(arena_t *const arena, const size_t size, size_t alignment)
         /* Check for overflow of the address range */
         if ((aligned_addr + size) > (uintptr_t)arena->end) {
                 /* Out of memory */
-                return NULL;
+                return ARENA_STATUS_OUT_OF_MEMORY;
         }
 
         /* Update internal state */
@@ -180,8 +194,9 @@ arena_alloc(arena_t *const arena, const size_t size, size_t alignment)
                 arena->high_water = arena->used;
         }
 
-        /* Return the aligned address as a void pointer */
-        return (void *)aligned_addr;
+        /* Return the aligned address through output parameter */
+        *result = (void *)aligned_addr;
+        return ARENA_STATUS_OK;
 }
 
 /* --------------------------------------------------------------- */
