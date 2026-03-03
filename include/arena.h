@@ -13,7 +13,9 @@
  *
  *********************************************************************/
 
-#pragma once
+/* MISRA C:2012 Dir 1.1: use standard include guard instead of #pragma once */
+#ifndef ARENA_H_
+#define ARENA_H_
 
 /* ------------------------------------------------------------------ */
 /*   INCLUDES                                                         */
@@ -59,9 +61,23 @@ typedef struct arena_s arena_t;
 /**
  * @brief Marker used to remember an arena position (checkpoint).
  *
- * The value is the offset in bytes from the start of the arena.
+ * The value is the byte offset from the start of the arena buffer.
+ * The sentinel value @ref ARENA_MARKER_INVALID is returned by
+ * arena_get_marker() when a NULL arena pointer is supplied.
  */
 typedef size_t arena_marker_t;
+
+/**
+ * @brief Sentinel returned by arena_get_marker() when @p arena is NULL.
+ *
+ * A valid marker is always in the range [0, capacity).  SIZE_MAX can
+ * never be a valid in-bounds offset, so it is safe to use as an error
+ * indicator without adding a new return type.
+ *
+ * Callers should compare the return value against ARENA_MARKER_INVALID
+ * before using the marker.
+ */
+#define ARENA_MARKER_INVALID ((arena_marker_t)(SIZE_MAX))
 
 /* ------------------------------------------------------------------ */
 /*   RETURN STATUS                                                    */
@@ -80,8 +96,7 @@ typedef enum {
             2, /**< Not enough space left in the arena */
         ARENA_STATUS_INVALID_ALIGNMENT =
             3, /**< Alignment is not a power of two or is zero */
-        ARENA_STATUS_INVALID_ARGUMENT =
-            4 /**< size or buffer length is zero */
+        ARENA_STATUS_INVALID_ARGUMENT = 4 /**< size or buffer length is zero */
 } arena_status_t;
 
 /* ------------------------------------------------------------------ */
@@ -109,7 +124,8 @@ typedef enum {
  *
  * @post The arena is ready for allocations.  Its used size is 0.
  */
-extern arena_status_t arena_init(arena_t *arena, void *buffer, size_t size);
+extern arena_status_t arena_init(arena_t *const arena, void *const buffer,
+                                 size_t size);
 
 /**
  * @brief Allocate a block of memory from the arena.
@@ -125,9 +141,11 @@ extern arena_status_t arena_init(arena_t *arena, void *buffer, size_t size);
  * @param[in]     alignment  Desired alignment in bytes (must be a power of two,
  *                           0 means default alignment)
  *
- * @retval ARENA_STATUS_OK               Allocation succeeded; @p *result is valid.
+ * @retval ARENA_STATUS_OK               Allocation succeeded; @p *result is
+ * valid.
  * @retval ARENA_STATUS_NULL_POINTER     @p arena or @p result is NULL.
- * @retval ARENA_STATUS_INVALID_ALIGNMENT @p alignment is non-zero and not a power of two.
+ * @retval ARENA_STATUS_INVALID_ALIGNMENT @p alignment is non-zero and not a
+ * power of two.
  * @retval ARENA_STATUS_INVALID_ARGUMENT @p size is zero.
  * @retval ARENA_STATUS_OUT_OF_MEMORY    Insufficient contiguous space remains.
  *
@@ -141,7 +159,8 @@ extern arena_status_t arena_init(arena_t *arena, void *buffer, size_t size);
  *
  * @note The caller must never free the returned pointer individually.
  */
-extern arena_status_t arena_alloc(arena_t *arena, void **result, size_t size, size_t alignment);
+extern arena_status_t arena_alloc(arena_t *const arena, void **const result,
+                                  size_t size, size_t alignment);
 
 /**
  * @brief Store the current arena position for later rewinding.
@@ -151,13 +170,15 @@ extern arena_status_t arena_alloc(arena_t *arena, void **result, size_t size, si
  *
  * @param[in] arena  Pointer to a valid arena (must not be NULL)
  *
- * @return Marker representing the current offset.
+ * @return Marker representing the current byte offset from the buffer
+ *         start, or @ref ARENA_MARKER_INVALID if @p arena is NULL.
  *
  * @pre arena != NULL
  *
- * @post Returned marker is valid for use with arena_rewind()
+ * @post Returned marker is valid for use with arena_rewind() iff
+ *       the return value != ARENA_MARKER_INVALID.
  */
-extern arena_marker_t arena_get_marker(const arena_t *arena);
+extern arena_marker_t arena_get_marker(const arena_t *const arena);
 
 /**
  * @brief Rewind the arena to a previously saved marker.
@@ -171,9 +192,10 @@ extern arena_marker_t arena_get_marker(const arena_t *arena);
  *
  * @pre arena != NULL
  *
- * @post The arena used size is equal to the supplied marker (if marker was valid)
+ * @post The arena used size is equal to the supplied marker (if marker was
+ * valid)
  */
-extern void arena_rewind(arena_t *arena, arena_marker_t marker);
+extern void arena_rewind(arena_t *const arena, arena_marker_t marker);
 
 /**
  * @brief Reset the arena to its initial empty state.
@@ -188,7 +210,7 @@ extern void arena_rewind(arena_t *arena, arena_marker_t marker);
  *
  * @post Used size of the arena is 0.
  */
-extern void arena_reset(arena_t *arena);
+extern void arena_reset(arena_t *const arena);
 
 /**
  * @brief Query the amount of memory currently used.
@@ -199,7 +221,7 @@ extern void arena_reset(arena_t *arena);
  *
  * @pre arena != NULL
  */
-extern size_t arena_get_used(const arena_t *arena);
+extern size_t arena_get_used(const arena_t *const arena);
 
 /**
  * @brief Query the high-water mark (maximum ever used) for the arena.
@@ -213,7 +235,7 @@ extern size_t arena_get_used(const arena_t *arena);
  *
  * @pre arena != NULL
  */
-extern size_t arena_get_high_water(const arena_t *arena);
+extern size_t arena_get_high_water(const arena_t *const arena);
 
 /**
  * @brief Query the total capacity of the arena.
@@ -224,8 +246,10 @@ extern size_t arena_get_high_water(const arena_t *arena);
  *
  * @pre arena != NULL
  */
-extern size_t arena_get_capacity(const arena_t *arena);
+extern size_t arena_get_capacity(const arena_t *const arena);
 
 /**
  * @}
  */  /* end of group arena */
+
+#endif /* ARENA_H_ */

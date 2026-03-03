@@ -26,7 +26,6 @@
 #include "arena.h"
 #include <limits.h>
 #include <stdbool.h>
-#include <string.h>
 _Static_assert(CHAR_BIT == 8, "Arena allocator requires an 8-bit byte");
 
 /* ------------------------------------------------------------------ */
@@ -206,7 +205,13 @@ arena_alloc(arena_t *const arena, void **const result, const size_t size,
                 }
         }
 
-        /* Return the aligned address through output parameter */
+        /* Return the aligned address through output parameter.
+         * MISRA C:2012 Rule 11.6 deviation: conversion from uintptr_t to
+         * void*.  Rationale: aligned_addr is derived from arena->current
+         * (itself a valid uint8_t*) via a round-trip through uintptr_t for
+         * alignment arithmetic.  The resulting address is guaranteed to lie
+         * within the backing buffer and to satisfy the requested alignment.
+         * No information is lost. */
         *result = (void *)aligned_addr;
         return ARENA_STATUS_OK;
 }
@@ -214,11 +219,13 @@ arena_alloc(arena_t *const arena, void **const result, const size_t size,
 arena_marker_t
 arena_get_marker(const arena_t *const arena)
 {
-        arena_marker_t marker = 0U;
-        if (arena != NULL) {
-                marker = (size_t)(arena->current - arena->start);
+        if (arena == NULL) {
+                /* Return sentinel: 0 is a valid offset so cannot be used as an
+                 * error value.  SIZE_MAX is never a reachable offset because no
+                 * buffer can span the full address space. */
+                return ARENA_MARKER_INVALID;
         }
-        return marker;
+        return (arena_marker_t)(arena->current - arena->start);
 }
 
 void

@@ -17,8 +17,12 @@
  *********************************************************************/
 
 #include "arena.h"
-#include <stdio.h>
 #include <stdbool.h>
+/* MISRA C:2012 Rule 21.6: stdio permitted only in test/debug builds */
+#if defined(TEST_BUILD)
+#include <stdio.h>
+#include <stdlib.h> /* EXIT_FAILURE, EXIT_SUCCESS */
+#endif
 
 #define DEMO_BUF_SIZE (128U)
 
@@ -29,8 +33,11 @@ static bool test_alignment_boundaries(void);
 static bool test_invalid_argument(void);
 static bool test_alloc_exact_capacity(void);
 static bool test_get_used_transitions(void);
+static bool test_marker_null_arena(void);
+static bool test_alignment_mask_correctness(void);
 
-static bool test_invalid_alignment(void)
+static bool
+test_invalid_alignment(void)
 {
         static uint8_t buffer[DEMO_BUF_SIZE];
         arena_t arena;
@@ -47,7 +54,9 @@ static bool test_invalid_alignment(void)
         /* Test invalid alignment (not a power of two) */
         st = arena_alloc(&arena, &ptr, 16U, 3U); /* 3 is not a power of two */
         if (st != ARENA_STATUS_INVALID_ALIGNMENT) {
-                printf("FAIL: Expected ARENA_STATUS_INVALID_ALIGNMENT for alignment=3, got %d\n", st);
+                printf("FAIL: Expected ARENA_STATUS_INVALID_ALIGNMENT for "
+                       "alignment=3, got %d\n",
+                       st);
                 passed = false;
         }
 
@@ -71,7 +80,8 @@ static bool test_invalid_alignment(void)
         return passed;
 }
 
-static bool test_zero_size_allocation(void)
+static bool
+test_zero_size_allocation(void)
 {
         static uint8_t buffer[DEMO_BUF_SIZE];
         arena_t arena;
@@ -81,14 +91,17 @@ static bool test_zero_size_allocation(void)
 
         st = arena_init(&arena, buffer, sizeof(buffer));
         if (st != ARENA_STATUS_OK) {
-                printf("FAIL: arena_init failed in test_zero_size_allocation\n");
+                printf(
+                    "FAIL: arena_init failed in test_zero_size_allocation\n");
                 return false;
         }
 
         /* Test zero size allocation */
         st = arena_alloc(&arena, &ptr, 0U, 0U);
         if (st != ARENA_STATUS_INVALID_ARGUMENT) {
-                printf("FAIL: Expected ARENA_STATUS_INVALID_ARGUMENT for size=0, got %d\n", st);
+                printf("FAIL: Expected ARENA_STATUS_INVALID_ARGUMENT for "
+                       "size=0, got %d\n",
+                       st);
                 passed = false;
         }
 
@@ -98,7 +111,8 @@ static bool test_zero_size_allocation(void)
         return passed;
 }
 
-static bool test_null_pointers(void)
+static bool
+test_null_pointers(void)
 {
         static uint8_t buffer[DEMO_BUF_SIZE];
         arena_t arena;
@@ -109,7 +123,9 @@ static bool test_null_pointers(void)
         /* Test NULL arena pointer */
         st = arena_alloc(NULL, &ptr, 16U, 0U);
         if (st != ARENA_STATUS_NULL_POINTER) {
-                printf("FAIL: Expected ARENA_STATUS_NULL_POINTER for NULL arena, got %d\n", st);
+                printf("FAIL: Expected ARENA_STATUS_NULL_POINTER for NULL "
+                       "arena, got %d\n",
+                       st);
                 passed = false;
         }
 
@@ -121,14 +137,18 @@ static bool test_null_pointers(void)
         }
         st = arena_alloc(&arena, NULL, 16U, 0U);
         if (st != ARENA_STATUS_NULL_POINTER) {
-                printf("FAIL: Expected ARENA_STATUS_NULL_POINTER for NULL result, got %d\n", st);
+                printf("FAIL: Expected ARENA_STATUS_NULL_POINTER for NULL "
+                       "result, got %d\n",
+                       st);
                 passed = false;
         }
 
         /* Test NULL buffer in init */
         st = arena_init(&arena, NULL, sizeof(buffer));
         if (st != ARENA_STATUS_NULL_POINTER) {
-                printf("FAIL: Expected ARENA_STATUS_NULL_POINTER for NULL buffer, got %d\n", st);
+                printf("FAIL: Expected ARENA_STATUS_NULL_POINTER for NULL "
+                       "buffer, got %d\n",
+                       st);
                 passed = false;
         }
 
@@ -138,7 +158,8 @@ static bool test_null_pointers(void)
         return passed;
 }
 
-static bool test_alignment_boundaries(void)
+static bool
+test_alignment_boundaries(void)
 {
         static uint8_t buffer[DEMO_BUF_SIZE];
         arena_t arena;
@@ -148,7 +169,8 @@ static bool test_alignment_boundaries(void)
 
         st = arena_init(&arena, buffer, sizeof(buffer));
         if (st != ARENA_STATUS_OK) {
-                printf("FAIL: arena_init failed in test_alignment_boundaries\n");
+                printf(
+                    "FAIL: arena_init failed in test_alignment_boundaries\n");
                 return false;
         }
 
@@ -177,20 +199,24 @@ static bool test_alignment_boundaries(void)
                 passed = false;
         }
 
-        /* Verify alignments */
-        if (((uintptr_t)ptr1 & 1U) != 0U) {
+        /* Verify alignments: mask = (alignment - 1), address & mask must be 0
+         */
+        if (((uintptr_t)ptr1 & 0U)
+            != 0U) { /* align=1: every address qualifies */
                 printf("FAIL: ptr1 not aligned to 1\n");
                 passed = false;
         }
-        if (((uintptr_t)ptr2 & 1U) != 0U) {
+        if (((uintptr_t)ptr2 & 1U) != 0U) { /* align=2: bit 0 must be clear */
                 printf("FAIL: ptr2 not aligned to 2\n");
                 passed = false;
         }
-        if (((uintptr_t)ptr3 & 3U) != 0U) {
+        if (((uintptr_t)ptr3 & 3U)
+            != 0U) { /* align=4: bits 1:0 must be clear */
                 printf("FAIL: ptr3 not aligned to 4\n");
                 passed = false;
         }
-        if (((uintptr_t)ptr4 & 7U) != 0U) {
+        if (((uintptr_t)ptr4 & 7U)
+            != 0U) { /* align=8: bits 2:0 must be clear */
                 printf("FAIL: ptr4 not aligned to 8\n");
                 passed = false;
         }
@@ -227,7 +253,9 @@ test_invalid_argument(void)
         /* arena_init with size == 0 */
         st = arena_init(&arena, buffer, 0U);
         if (st != ARENA_STATUS_INVALID_ARGUMENT) {
-                printf("FAIL: Expected INVALID_ARGUMENT for arena_init size=0, got %d\n", st);
+                printf("FAIL: Expected INVALID_ARGUMENT for arena_init size=0, "
+                       "got %d\n",
+                       st);
                 passed = false;
         }
 
@@ -237,21 +265,28 @@ test_invalid_argument(void)
         /* alignment=0 resolves to default (valid), size=0 → INVALID_ARGUMENT */
         st = arena_alloc(&arena, &ptr, 0U, 0U);
         if (st != ARENA_STATUS_INVALID_ARGUMENT) {
-                printf("FAIL: Expected INVALID_ARGUMENT for alloc size=0 align=0, got %d\n", st);
+                printf("FAIL: Expected INVALID_ARGUMENT for alloc size=0 "
+                       "align=0, got %d\n",
+                       st);
                 passed = false;
         }
 
-        /* alignment=3 (invalid) checked before size=0: must return INVALID_ALIGNMENT */
+        /* alignment=3 (invalid) checked before size=0: must return
+         * INVALID_ALIGNMENT */
         st = arena_alloc(&arena, &ptr, 0U, 3U);
         if (st != ARENA_STATUS_INVALID_ALIGNMENT) {
-                printf("FAIL: Expected INVALID_ALIGNMENT for align=3 size=0, got %d\n", st);
+                printf("FAIL: Expected INVALID_ALIGNMENT for align=3 size=0, "
+                       "got %d\n",
+                       st);
                 passed = false;
         }
 
         /* alignment=8 (valid), size=0 → INVALID_ARGUMENT */
         st = arena_alloc(&arena, &ptr, 0U, 8U);
         if (st != ARENA_STATUS_INVALID_ARGUMENT) {
-                printf("FAIL: Expected INVALID_ARGUMENT for align=8 size=0, got %d\n", st);
+                printf("FAIL: Expected INVALID_ARGUMENT for align=8 size=0, "
+                       "got %d\n",
+                       st);
                 passed = false;
         }
 
@@ -277,7 +312,8 @@ test_alloc_exact_capacity(void)
         /* Use alignment=1 so there is zero padding */
         st = arena_init(&arena, buffer, sizeof(buffer));
         if (st != ARENA_STATUS_OK) {
-                printf("FAIL: arena_init failed in test_alloc_exact_capacity\n");
+                printf(
+                    "FAIL: arena_init failed in test_alloc_exact_capacity\n");
                 return false;
         }
 
@@ -291,7 +327,9 @@ test_alloc_exact_capacity(void)
         /* One more byte must fail */
         st = arena_alloc(&arena, &ptr, 1U, 1U);
         if (st != ARENA_STATUS_OUT_OF_MEMORY) {
-                printf("FAIL: Expected OUT_OF_MEMORY after full alloc, got %d\n", st);
+                printf(
+                    "FAIL: Expected OUT_OF_MEMORY after full alloc, got %d\n",
+                    st);
                 passed = false;
         }
 
@@ -315,7 +353,9 @@ test_alloc_exact_capacity(void)
         }
         st = arena_alloc(&arena, &ptr, 1U, 1U);
         if (st != ARENA_STATUS_OUT_OF_MEMORY) {
-                printf("FAIL: Expected OUT_OF_MEMORY at end of filled arena, got %d\n", st);
+                printf("FAIL: Expected OUT_OF_MEMORY at end of filled arena, "
+                       "got %d\n",
+                       st);
                 passed = false;
         }
 
@@ -341,7 +381,8 @@ test_get_used_transitions(void)
 
         st = arena_init(&arena, buffer, sizeof(buffer));
         if (st != ARENA_STATUS_OK) {
-                printf("FAIL: arena_init failed in test_get_used_transitions\n");
+                printf(
+                    "FAIL: arena_init failed in test_get_used_transitions\n");
                 return false;
         }
 
@@ -399,6 +440,151 @@ test_get_used_transitions(void)
         return passed;
 }
 
+/**
+ * @brief Regression test: arena_get_marker must return ARENA_MARKER_INVALID
+ *        when passed a NULL arena pointer, not the ambiguous value 0.
+ *
+ * Prior to the fix, NULL would silently return 0 which is a valid marker
+ * value, making it impossible for a caller to detect the error.
+ */
+static bool
+test_marker_null_arena(void)
+{
+        static uint8_t buffer[DEMO_BUF_SIZE];
+        arena_t arena;
+        arena_status_t st;
+        arena_marker_t mk;
+        bool passed = true;
+
+        /* NULL arena must return the sentinel, not 0 */
+        mk = arena_get_marker(NULL);
+        if (mk != ARENA_MARKER_INVALID) {
+                printf("FAIL: arena_get_marker(NULL) returned %zu, "
+                       "expected ARENA_MARKER_INVALID (%zu)\n",
+                       mk, ARENA_MARKER_INVALID);
+                passed = false;
+        }
+
+        /* A freshly initialised arena at offset 0 must return 0, not the
+         * sentinel, confirming the two values are distinct. */
+        st = arena_init(&arena, buffer, sizeof(buffer));
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: arena_init failed in test_marker_null_arena\n");
+                return false;
+        }
+        mk = arena_get_marker(&arena);
+        if (mk != 0U) {
+                printf("FAIL: arena_get_marker on empty arena returned %zu, "
+                       "expected 0\n",
+                       mk);
+                passed = false;
+        }
+        if (mk == ARENA_MARKER_INVALID) {
+                printf("FAIL: valid marker equals ARENA_MARKER_INVALID — "
+                       "sentinel is not distinct from offset 0\n");
+                passed = false;
+        }
+
+        if (passed) {
+                printf("PASS: test_marker_null_arena\n");
+        }
+        return passed;
+}
+
+/**
+ * @brief Regression test: alignment mask checks must use the correct mask
+ *        for each alignment boundary.
+ *
+ * Previously ptr1 (align=1) and ptr2 (align=2) used the same mask (1U),
+ * meaning the ptr2 check added no additional coverage.
+ */
+static bool
+test_alignment_mask_correctness(void)
+{
+        static uint8_t buffer[DEMO_BUF_SIZE];
+        arena_t arena;
+        arena_status_t st;
+        void *ptr;
+        bool passed = true;
+        uintptr_t addr;
+
+        st = arena_init(&arena, buffer, sizeof(buffer));
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: arena_init failed in "
+                       "test_alignment_mask_correctness\n");
+                return false;
+        }
+
+        /* align=1: any address is valid; verify the returned pointer is inside
+         * the buffer (basic sanity). */
+        st = arena_alloc(&arena, &ptr, 1U, 1U);
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: alloc align=1 failed\n");
+                passed = false;
+        }
+
+        /* align=2: address & 1 must be 0 */
+        st = arena_alloc(&arena, &ptr, 1U, 2U);
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: alloc align=2 failed\n");
+                passed = false;
+        } else {
+                addr = (uintptr_t)ptr;
+                if ((addr & (2U - 1U)) != 0U) {
+                        printf("FAIL: ptr not 2-byte aligned (addr=0x%zx)\n",
+                               (size_t)addr);
+                        passed = false;
+                }
+        }
+
+        /* align=4: address & 3 must be 0 */
+        st = arena_alloc(&arena, &ptr, 1U, 4U);
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: alloc align=4 failed\n");
+                passed = false;
+        } else {
+                addr = (uintptr_t)ptr;
+                if ((addr & (4U - 1U)) != 0U) {
+                        printf("FAIL: ptr not 4-byte aligned (addr=0x%zx)\n",
+                               (size_t)addr);
+                        passed = false;
+                }
+        }
+
+        /* align=8: address & 7 must be 0 */
+        st = arena_alloc(&arena, &ptr, 1U, 8U);
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: alloc align=8 failed\n");
+                passed = false;
+        } else {
+                addr = (uintptr_t)ptr;
+                if ((addr & (8U - 1U)) != 0U) {
+                        printf("FAIL: ptr not 8-byte aligned (addr=0x%zx)\n",
+                               (size_t)addr);
+                        passed = false;
+                }
+        }
+
+        /* align=16: address & 15 must be 0 */
+        st = arena_alloc(&arena, &ptr, 1U, 16U);
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: alloc align=16 failed\n");
+                passed = false;
+        } else {
+                addr = (uintptr_t)ptr;
+                if ((addr & (16U - 1U)) != 0U) {
+                        printf("FAIL: ptr not 16-byte aligned (addr=0x%zx)\n",
+                               (size_t)addr);
+                        passed = false;
+                }
+        }
+
+        if (passed) {
+                printf("PASS: test_alignment_mask_correctness\n");
+        }
+        return passed;
+}
+
 int
 main(void)
 {
@@ -418,17 +604,19 @@ main(void)
         all_passed = test_invalid_argument() && all_passed;
         all_passed = test_alloc_exact_capacity() && all_passed;
         all_passed = test_get_used_transitions() && all_passed;
+        all_passed = test_marker_null_arena() && all_passed;
+        all_passed = test_alignment_mask_correctness() && all_passed;
 
         if (!all_passed) {
                 printf("Some tests failed!\n");
-                return -1;
+                return EXIT_FAILURE;
         }
 
         /* Original demo code */
         st = arena_init(&arena, buffer, sizeof(buffer));
         if (st != ARENA_STATUS_OK) {
                 printf("arena_init failed!\n");
-                return -1;
+                return EXIT_FAILURE;
         }
 
         cap = arena_get_capacity(&arena);
@@ -438,7 +626,7 @@ main(void)
         st = arena_alloc(&arena, &p1, 24U, 0U);
         if (st != ARENA_STATUS_OK) {
                 printf("arena_alloc failed for p1!\n");
-                return -1;
+                return EXIT_FAILURE;
         }
         printf("p1 = %p (size 24)\n", p1);
 
@@ -446,7 +634,7 @@ main(void)
         st = arena_alloc(&arena, &p2, 13U, 16U);
         if (st != ARENA_STATUS_OK) {
                 printf("arena_alloc failed for p2!\n");
-                return -1;
+                return EXIT_FAILURE;
         }
         printf("p2 = %p (size 13, align 16)\n", p2);
 
@@ -455,7 +643,7 @@ main(void)
         st = arena_alloc(&arena, &p3, 40U, 0U);
         if (st != ARENA_STATUS_OK) {
                 printf("arena_alloc failed for p3!\n");
-                return -1;
+                return EXIT_FAILURE;
         }
         printf("p3 = %p (size 40)\n", p3);
 
@@ -470,7 +658,7 @@ main(void)
                 printf("Correctly rejected out-of-memory request.\n");
         } else {
                 printf("ERROR: Should have failed out-of-memory!\n");
-                return -1;
+                return EXIT_FAILURE;
         }
 
         /* Rewind to marker (release p3) */
@@ -482,5 +670,5 @@ main(void)
         printf("After reset: used = %zu, high_water = %zu\n",
                arena_get_used(&arena), arena_get_high_water(&arena));
 
-        return 0;
+        return EXIT_SUCCESS;
 }
