@@ -627,8 +627,11 @@ test_init_size_overflow(void)
                 passed = false;
         }
 
-        /* Exactly headroom bytes must still succeed (end == UINTPTR_MAX is
-         * the one-past-end sentinel and is a valid pointer value). */
+        /* Exactly headroom bytes must still succeed.  The resulting end
+         * pointer holds the integer value UINTPTR_MAX, which is not a
+         * dereferenceable address, but arena->end is used only as a
+         * numeric sentinel in comparisons and is never dereferenced, so
+         * this is well-defined on all flat-address-space targets. */
         st = arena_init(&arena, buffer, headroom);
         if (st != ARENA_STATUS_OK) {
                 printf("FAIL: Expected OK for size=headroom, got %d\n", st);

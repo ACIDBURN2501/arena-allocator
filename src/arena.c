@@ -140,15 +140,16 @@ arena_init(arena_t *const arena, void *const buffer, const size_t size)
         }
 
         /*
-         * Guard against pointer wrap-around: if (uintptr_t)buffer + size
-         * would exceed UINTPTR_MAX the addition on line below is UB per
-         * C11 §6.5.6p8 (result outside the array object).  It also makes
-         * arena_get_capacity() return a nonsensical value and, when
-         * ARENA_CFG_DEBUG_POISON is enabled, causes arena_fill() to iterate
-         * SIZE_MAX times and write far outside the buffer.
+         * Guard against integer wrap-around: reject any size that would
+         * cause (uintptr_t)buffer + size to overflow UINTPTR_MAX.
          *
-         * The idiom mirrors align_up() in this file which already uses
-         * (UINTPTR_MAX - mask) for the same reason.
+         * The end pointer is computed via integer arithmetic below
+         * (C11 §6.3.2.3, implementation-defined) rather than pointer
+         * arithmetic (C11 §6.5.6p8, which is UB for offsets that fall
+         * outside the array object).  arena->end is never dereferenced;
+         * it is used only as a numeric sentinel in comparisons, so
+         * implementation-defined integer-to-pointer conversion is
+         * sufficient and well-behaved on all flat-address-space targets.
          */
         if (size > (UINTPTR_MAX - (uintptr_t)buffer)) {
                 return ARENA_STATUS_INVALID_ARGUMENT;
@@ -157,7 +158,7 @@ arena_init(arena_t *const arena, void *const buffer, const size_t size)
         /* Cast buffer to unsigned byte pointer for arithmetic */
         arena->start = (uint8_t *)buffer;
         arena->current = arena->start;
-        arena->end = arena->start + size;
+        arena->end = (uint8_t *)((uintptr_t)arena->start + size);
         arena->high_water = 0U;
 #if (ARENA_CFG_DEBUG_POISON != 0)
         arena->poison = ARENA_CFG_POISON_PATTERN;
