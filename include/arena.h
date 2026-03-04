@@ -116,11 +116,14 @@ typedef enum {
  *
  * @retval ARENA_STATUS_OK               Initialisation succeeded.
  * @retval ARENA_STATUS_NULL_POINTER     @p arena or @p buffer is NULL.
- * @retval ARENA_STATUS_INVALID_ARGUMENT @p size is zero.
+ * @retval ARENA_STATUS_INVALID_ARGUMENT @p size is zero, or
+ *                                       @p size > (UINTPTR_MAX - (uintptr_t)buffer)
+ *                                       (addition would overflow the pointer).
  *
  * @pre arena != NULL
  * @pre buffer != NULL
  * @pre size > 0
+ * @pre size <= (UINTPTR_MAX - (uintptr_t)buffer)
  *
  * @post The arena is ready for allocations.  Its used size is 0.
  */

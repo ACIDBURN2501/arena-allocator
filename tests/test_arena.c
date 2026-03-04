@@ -35,6 +35,7 @@ static bool test_alloc_exact_capacity(void);
 static bool test_get_used_transitions(void);
 static bool test_marker_null_arena(void);
 static bool test_alignment_mask_correctness(void);
+static bool test_init_size_overflow(void);
 
 static bool
 test_invalid_alignment(void)
@@ -585,6 +586,69 @@ test_alignment_mask_correctness(void)
         return passed;
 }
 
+/**
+ * @brief Regression test: arena_init() must reject a size that would cause
+ *        pointer wrap-around (i.e. buffer + size > UINTPTR_MAX).
+ *
+ * Without the guard, the addition on "arena->end = arena->start + size" is
+ * undefined behaviour per C11 §6.5.6p8 when the result falls outside the
+ * array object.  It also produces a nonsensical arena_get_capacity() value
+ * and, when ARENA_CFG_DEBUG_POISON is enabled, causes arena_fill() to
+ * iterate SIZE_MAX times and write far outside the buffer.
+ */
+static bool
+test_init_size_overflow(void)
+{
+        static uint8_t buffer[DEMO_BUF_SIZE];
+        arena_t arena;
+        arena_status_t st;
+        bool passed = true;
+
+        /* Compute the largest size that does NOT overflow for this buffer. */
+        const size_t headroom =
+            (size_t)(UINTPTR_MAX - (uintptr_t)buffer);
+
+        /* One byte beyond headroom must be rejected. */
+        st = arena_init(&arena, buffer, headroom + 1U);
+        if (st != ARENA_STATUS_INVALID_ARGUMENT) {
+                printf("FAIL: Expected INVALID_ARGUMENT for size=headroom+1, "
+                       "got %d\n",
+                       st);
+                passed = false;
+        }
+
+        /* SIZE_MAX must also be rejected (it exceeds headroom on any
+         * non-zero buffer address). */
+        st = arena_init(&arena, buffer, (size_t)-1);
+        if (st != ARENA_STATUS_INVALID_ARGUMENT) {
+                printf("FAIL: Expected INVALID_ARGUMENT for size=SIZE_MAX, "
+                       "got %d\n",
+                       st);
+                passed = false;
+        }
+
+        /* Exactly headroom bytes must still succeed (end == UINTPTR_MAX is
+         * the one-past-end sentinel and is a valid pointer value). */
+        st = arena_init(&arena, buffer, headroom);
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: Expected OK for size=headroom, got %d\n", st);
+                passed = false;
+        }
+
+        /* A normal-sized init must continue to work. */
+        st = arena_init(&arena, buffer, sizeof(buffer));
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: Expected OK for size=sizeof(buffer), got %d\n",
+                       st);
+                passed = false;
+        }
+
+        if (passed) {
+                printf("PASS: test_init_size_overflow\n");
+        }
+        return passed;
+}
+
 int
 main(void)
 {
@@ -606,6 +670,7 @@ main(void)
         all_passed = test_get_used_transitions() && all_passed;
         all_passed = test_marker_null_arena() && all_passed;
         all_passed = test_alignment_mask_correctness() && all_passed;
+        all_passed = test_init_size_overflow() && all_passed;
 
         if (!all_passed) {
                 printf("Some tests failed!\n");

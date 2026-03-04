@@ -139,6 +139,21 @@ arena_init(arena_t *const arena, void *const buffer, const size_t size)
                 return ARENA_STATUS_INVALID_ARGUMENT;
         }
 
+        /*
+         * Guard against pointer wrap-around: if (uintptr_t)buffer + size
+         * would exceed UINTPTR_MAX the addition on line below is UB per
+         * C11 §6.5.6p8 (result outside the array object).  It also makes
+         * arena_get_capacity() return a nonsensical value and, when
+         * ARENA_CFG_DEBUG_POISON is enabled, causes arena_fill() to iterate
+         * SIZE_MAX times and write far outside the buffer.
+         *
+         * The idiom mirrors align_up() in this file which already uses
+         * (UINTPTR_MAX - mask) for the same reason.
+         */
+        if (size > (UINTPTR_MAX - (uintptr_t)buffer)) {
+                return ARENA_STATUS_INVALID_ARGUMENT;
+        }
+
         /* Cast buffer to unsigned byte pointer for arithmetic */
         arena->start = (uint8_t *)buffer;
         arena->current = arena->start;
