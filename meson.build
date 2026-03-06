@@ -1,7 +1,7 @@
 project(
   'arena-allocator',
   'c',
-  version: '1.1.6',
+  version: '1.1.7',
   default_options: ['warning_level=3'],
 )
 
@@ -10,7 +10,7 @@ src = ['src/arena.c']
 
 libarena = static_library('arena', src, include_directories: inc, install: true)
 
-install_headers('include/arena.h')
+install_headers('include/arena.h', 'include/arena_cfg.h')
 
 if get_option('build_tests')
   subdir('tests')

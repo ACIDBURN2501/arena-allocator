@@ -17,10 +17,11 @@ A deterministic arena (bump) allocator in C for safety-critical embedded systems
 
 ### Copy-in (recommended for embedded targets)
 
-Copy two files into your project tree — no build system required:
+Copy three files into your project tree -- no build system required:
 
 ```
 include/arena.h
+include/arena_cfg.h
 src/arena.c
 ```
 
@@ -81,8 +82,8 @@ int main(void)
 
 ## Configuration
 
-All macros can be overridden before including the header or passed as
-`-D` flags on the compiler command line.
+All macros live in `arena_cfg.h` and can be overridden before including the
+header or passed as `-D` flags on the compiler command line.
 
 | Macro | Description | Default |
 |---|---|---|
@@ -148,7 +149,8 @@ Allocate `size` bytes with the requested alignment. Pass `alignment = 0` to use
 the default (`ARENA_CFG_DEFAULT_ALIGNMENT`, 8 bytes). Returns
 `ARENA_STATUS_INVALID_ARGUMENT` if `size` is zero,
 `ARENA_STATUS_INVALID_ALIGNMENT` if `alignment` is non-zero and not a power of
-two, or `ARENA_STATUS_OUT_OF_MEMORY` if the arena is full.
+two, or `ARENA_STATUS_OUT_OF_MEMORY` if the arena is full. On failure,
+`*result` is set to `NULL`.
 
 ### Checkpointing
 

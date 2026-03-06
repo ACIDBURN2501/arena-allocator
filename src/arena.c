@@ -40,21 +40,6 @@ _Static_assert((ARENA_CFG_DEFAULT_ALIGNMENT != 0U)
                "ARENA_CFG_DEFAULT_ALIGNMENT must be a power of two");
 
 /* ------------------------------------------------------------------ */
-/*   INTERNAL OPAQUE STRUCT DEFINITION                                */
-/* ------------------------------------------------------------------ */
-#ifndef TEST_BUILD
-struct arena_s {
-        uint8_t *start;    /**< Pointer to the start of the backing buffer  */
-        uint8_t *current;  /**< Bump pointer (next free byte)               */
-        uint8_t *end;      /**< One past the last valid byte of the buffer  */
-        size_t high_water; /**< Highest ever value of used                  */
-#if (ARENA_CFG_DEBUG_POISON != 0)
-        uint8_t poison; /**< Debug fill byte (default 0xAA)                 */
-#endif
-};
-#endif /* TEST_BUILD */
-
-/* ------------------------------------------------------------------ */
 /*   STATIC INLINE HELPERS                                             */
 /* ------------------------------------------------------------------ */
 
@@ -142,27 +127,16 @@ arena_init(arena_t *const arena, void *const buffer, const size_t size)
         /*
          * Guard against integer wrap-around: reject any size that would
          * cause (uintptr_t)buffer + size to overflow UINTPTR_MAX.
-         *
-         * The end pointer is computed via integer arithmetic below
-         * (C11 §6.3.2.3, implementation-defined) rather than pointer
-         * arithmetic (C11 §6.5.6p8, which is UB for offsets that fall
-         * outside the array object).  arena->end is never dereferenced;
-         * it is used only as a numeric sentinel in comparisons, so
-         * implementation-defined integer-to-pointer conversion is
-         * sufficient and well-behaved on all flat-address-space targets.
          */
         if (size > (UINTPTR_MAX - (uintptr_t)buffer)) {
                 return ARENA_STATUS_INVALID_ARGUMENT;
         }
 
-        /* Cast buffer to unsigned byte pointer for arithmetic */
         arena->start = (uint8_t *)buffer;
-        arena->current = arena->start;
-        arena->end = (uint8_t *)((uintptr_t)arena->start + size);
+        arena->capacity = size;
+        arena->current_offset = 0U;
         arena->high_water = 0U;
-#if (ARENA_CFG_DEBUG_POISON != 0)
         arena->poison = ARENA_CFG_POISON_PATTERN;
-#endif
 
         /* Optional fill with poison to catch use-after-reset in tests */
         arena_fill(arena->start, size, ARENA_CFG_POISON_PATTERN);
@@ -174,14 +148,18 @@ arena_status_t
 arena_alloc(arena_t *const arena, void **const result, const size_t size,
             size_t alignment)
 {
+        uintptr_t start_addr;
         uintptr_t aligned_addr;
         uintptr_t cur_addr;
+        size_t aligned_offset;
+
+        if (result == NULL) {
+                return ARENA_STATUS_NULL_POINTER;
+        }
+        *result = NULL;
 
         /* Defensive checks */
         if (arena == NULL) {
-                return ARENA_STATUS_NULL_POINTER;
-        }
-        if (result == NULL) {
                 return ARENA_STATUS_NULL_POINTER;
         }
 
@@ -199,36 +177,32 @@ arena_alloc(arena_t *const arena, void **const result, const size_t size,
                 return ARENA_STATUS_INVALID_ARGUMENT;
         }
 
-        cur_addr = (uintptr_t)arena->current;
+        start_addr = (uintptr_t)arena->start;
+        cur_addr = start_addr + arena->current_offset;
         aligned_addr = align_up(cur_addr, alignment);
 
-        /* 1. Aligned address must be inside the buffer */
-        if (aligned_addr >= (uintptr_t)arena->end) {
+        if ((aligned_addr == UINTPTR_MAX) || (aligned_addr < start_addr)) {
                 return ARENA_STATUS_OUT_OF_MEMORY;
         }
-        /* 2. Remaining space must fit the requested size (no wrap, since
-         * aligned_addr < end) */
-        if (size > ((uintptr_t)arena->end - aligned_addr)) {
+
+        aligned_offset = (size_t)(aligned_addr - start_addr);
+
+        /* 1. Aligned address must be inside the buffer */
+        if (aligned_offset >= arena->capacity) {
+                return ARENA_STATUS_OUT_OF_MEMORY;
+        }
+        /* 2. Remaining space must fit the requested size */
+        if (size > (arena->capacity - aligned_offset)) {
                 return ARENA_STATUS_OUT_OF_MEMORY;
         }
 
         /* Update internal state */
-        arena->current = (uint8_t *)(aligned_addr + size);
-        {
-                const size_t used = (size_t)(arena->current - arena->start);
-                if (used > arena->high_water) {
-                        arena->high_water = used;
-                }
+        arena->current_offset = aligned_offset + size;
+        if (arena->current_offset > arena->high_water) {
+                arena->high_water = arena->current_offset;
         }
 
-        /* Return the aligned address through output parameter.
-         * MISRA C:2012 Rule 11.6 deviation: conversion from uintptr_t to
-         * void*.  Rationale: aligned_addr is derived from arena->current
-         * (itself a valid uint8_t*) via a round-trip through uintptr_t for
-         * alignment arithmetic.  The resulting address is guaranteed to lie
-         * within the backing buffer and to satisfy the requested alignment.
-         * No information is lost. */
-        *result = (void *)aligned_addr;
+        *result = (void *)(arena->start + aligned_offset);
         return ARENA_STATUS_OK;
 }
 
@@ -241,7 +215,7 @@ arena_get_marker(const arena_t *const arena)
                  * buffer can span the full address space. */
                 return ARENA_MARKER_INVALID;
         }
-        return (arena_marker_t)(arena->current - arena->start);
+        return (arena_marker_t)arena->current_offset;
 }
 
 void
@@ -252,16 +226,16 @@ arena_rewind(arena_t *const arena, const arena_marker_t marker)
         }
 
         /* Marker must be within the used range; if not we ignore it */
-        if (marker <= (arena_marker_t)(arena->current - arena->start)) {
-                arena->current = arena->start + marker;
+        if (marker <= (arena_marker_t)arena->current_offset) {
+                arena->current_offset = (size_t)marker;
 
 #if (ARENA_CFG_DEBUG_POISON != 0)
                 /* Poison the entire free tail [current, end).  This is
                  * intentional: after rewind, only [start, current) remains
                  * live, so keeping all free space poisoned helps detect
                  * stale accesses without affecting valid allocations. */
-                arena_fill(arena->current,
-                           (size_t)(arena->end - arena->current),
+                arena_fill(arena->start + arena->current_offset,
+                           arena->capacity - arena->current_offset,
                            arena->poison);
 #endif
         }
@@ -274,18 +248,17 @@ arena_reset(arena_t *const arena)
                 return;
         }
 
-        arena->current = arena->start;
+        arena->current_offset = 0U;
 
 #if (ARENA_CFG_DEBUG_POISON != 0)
-        arena_fill(arena->start, (size_t)(arena->end - arena->start),
-                   arena->poison);
+        arena_fill(arena->start, arena->capacity, arena->poison);
 #endif
 }
 
 size_t
 arena_get_used(const arena_t *const arena)
 {
-        return (arena != NULL) ? (size_t)(arena->current - arena->start) : 0U;
+        return (arena != NULL) ? arena->current_offset : 0U;
 }
 
 size_t
@@ -299,7 +272,7 @@ arena_get_capacity(const arena_t *const arena)
 {
         size_t capacity = 0U;
         if (arena != NULL) {
-                capacity = (size_t)(arena->end - arena->start);
+                capacity = arena->capacity;
         }
         return capacity;
 }

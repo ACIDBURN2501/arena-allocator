@@ -10,6 +10,7 @@ static bool test_zero_size_allocation(void);
 static bool test_null_pointers(void);
 static bool test_invalid_argument(void);
 static bool test_query_null_helpers(void);
+static bool test_failed_alloc_clears_result(void);
 
 static bool
 test_invalid_alignment(void)
@@ -63,7 +64,8 @@ test_zero_size_allocation(void)
 
         st = arena_init(&arena, buffer, sizeof(buffer));
         if (st != ARENA_STATUS_OK) {
-                printf("FAIL: arena_init failed in test_zero_size_allocation\n");
+                printf(
+                    "FAIL: arena_init failed in test_zero_size_allocation\n");
                 return false;
         }
 
@@ -206,6 +208,62 @@ test_query_null_helpers(void)
         return passed;
 }
 
+static bool
+test_failed_alloc_clears_result(void)
+{
+        static uint8_t buffer[DEMO_BUF_SIZE];
+        arena_t arena;
+        arena_status_t st;
+        void *ptr = buffer;
+        bool passed = true;
+
+        st = arena_init(&arena, buffer, sizeof(buffer));
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: arena_init failed in "
+                       "test_failed_alloc_clears_result\n");
+                return false;
+        }
+
+        st = arena_alloc(&arena, &ptr, 0U, 1U);
+        if ((st != ARENA_STATUS_INVALID_ARGUMENT) || (ptr != NULL)) {
+                printf("FAIL: invalid-argument alloc did not clear result\n");
+                passed = false;
+        }
+
+        ptr = buffer;
+        st = arena_alloc(&arena, &ptr, 1U, 3U);
+        if ((st != ARENA_STATUS_INVALID_ALIGNMENT) || (ptr != NULL)) {
+                printf("FAIL: invalid-alignment alloc did not clear result\n");
+                passed = false;
+        }
+
+        ptr = buffer;
+        st = arena_alloc(&arena, &ptr, sizeof(buffer), 1U);
+        if (st != ARENA_STATUS_OK) {
+                printf(
+                    "FAIL: exact-capacity alloc failed in result-clear test\n");
+                return false;
+        }
+
+        st = arena_alloc(&arena, &ptr, 1U, 1U);
+        if ((st != ARENA_STATUS_OUT_OF_MEMORY) || (ptr != NULL)) {
+                printf("FAIL: out-of-memory alloc did not clear result\n");
+                passed = false;
+        }
+
+        ptr = buffer;
+        st = arena_alloc(NULL, &ptr, 1U, 1U);
+        if ((st != ARENA_STATUS_NULL_POINTER) || (ptr != NULL)) {
+                printf("FAIL: NULL arena alloc did not clear result\n");
+                passed = false;
+        }
+
+        if (passed) {
+                printf("PASS: test_failed_alloc_clears_result\n");
+        }
+        return passed;
+}
+
 bool
 run_api_tests(void)
 {
@@ -216,6 +274,7 @@ run_api_tests(void)
         all_passed = test_null_pointers() && all_passed;
         all_passed = test_invalid_argument() && all_passed;
         all_passed = test_query_null_helpers() && all_passed;
+        all_passed = test_failed_alloc_clears_result() && all_passed;
 
         return all_passed;
 }

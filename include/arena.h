@@ -33,30 +33,25 @@
  */
 
 /* ------------------------------------------------------------------ */
-/*   OPAQUE TYPE                                                       */
+/*   ARENA TYPE                                                        */
 /* ------------------------------------------------------------------ */
 
 /**
- * @brief Opaque handle for an arena instance.
+ * @brief Arena storage and state.
  *
- * The structure is defined in arena.c and must not be accessed
+ * This type is intentionally defined in the public header so callers can
+ * allocate it statically or on the stack without dynamic memory.
+ *
+ * The fields are internal allocator state and must not be modified
  * directly by user code.
  */
-#ifndef TEST_BUILD
-typedef struct arena_s arena_t;
-#else
-
-struct arena_s {
-        uint8_t *start;
-        uint8_t *current;
-        uint8_t *end;
-        size_t high_water;
-#if (ARENA_CFG_DEBUG_POISON != 0)
-        uint8_t poison;
-#endif
-};
-typedef struct arena_s arena_t;
-#endif
+typedef struct arena_s {
+        uint8_t *start;        /**< Start of the backing buffer           */
+        size_t capacity;       /**< Total buffer size in bytes            */
+        size_t current_offset; /**< Next free offset from @ref start      */
+        size_t high_water;     /**< Maximum observed used size            */
+        uint8_t poison;        /**< Debug poison pattern cache            */
+} arena_t;
 
 /**
  * @brief Marker used to remember an arena position (checkpoint).
@@ -70,7 +65,7 @@ typedef size_t arena_marker_t;
 /**
  * @brief Sentinel returned by arena_get_marker() when @p arena is NULL.
  *
- * A valid marker is always in the range [0, capacity).  SIZE_MAX can
+ * A valid marker is always in the range [0, capacity].  SIZE_MAX can
  * never be a valid in-bounds offset, so it is safe to use as an error
  * indicator without adding a new return type.
  *
@@ -117,8 +112,8 @@ typedef enum {
  * @retval ARENA_STATUS_OK               Initialisation succeeded.
  * @retval ARENA_STATUS_NULL_POINTER     @p arena or @p buffer is NULL.
  * @retval ARENA_STATUS_INVALID_ARGUMENT @p size is zero, or
- *                                       @p size > (UINTPTR_MAX - (uintptr_t)buffer)
- *                                       (addition would overflow the pointer).
+ *                                       @p size > (UINTPTR_MAX -
+ * (uintptr_t)buffer) (addition would overflow the pointer).
  *
  * @pre arena != NULL
  * @pre buffer != NULL
@@ -158,6 +153,7 @@ extern arena_status_t arena_init(arena_t *const arena, void *const buffer,
  * @pre alignment == 0 || is_power_of_two(alignment)
  *
  * @post If successful, *result points to allocated memory
+ * @post If the function fails and @p result is non-NULL, *result is set to NULL
  * @post The arena used size is increased by the allocated size
  *
  * @note The caller must never free the returned pointer individually.

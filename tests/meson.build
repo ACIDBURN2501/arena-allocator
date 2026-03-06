@@ -1,4 +1,5 @@
 inc = include_directories('../include', '../config')
+python = import('python').find_installation('python3')
 
 test_exe = executable('test_arena',
         'test_arena.c',
@@ -20,3 +21,6 @@ poison_test_exe = executable('test_arena_poison',
 
 test('arena_test', test_exe)
 test('arena_poison_test', poison_test_exe)
+test('arena_install_smoke', python,
+     args : [files('run_install_smoke.py'), meson.project_source_root(),
+             meson.project_build_root()])

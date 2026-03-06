@@ -43,13 +43,14 @@ jobs:
       - name: Build
         run: meson compile -C build
 
-      - name: Verify poison test is registered
+      - name: Verify poison and install smoke tests are registered
         run: >
           python -c
           "import subprocess, sys;
           out = subprocess.check_output(['meson', 'test', '-C', 'build', '--list'], text=True);
           print(out, end='');
-          sys.exit(0 if 'arena_poison_test' in out else 1)"
+          required = ('arena_poison_test', 'arena_install_smoke');
+          sys.exit(0 if all(name in out for name in required) else 1)"
 
       - name: Run test suite
         run: meson test -C build --verbose
