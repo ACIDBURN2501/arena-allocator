@@ -11,9 +11,24 @@ import sys
 import tempfile
 
 
+def find_single_path(root: pathlib.Path, pattern: str) -> pathlib.Path:
+    matches = sorted(root.rglob(pattern))
+    if len(matches) != 1:
+        print(
+            f"FAIL: expected exactly one match for {pattern!r} under {root}, "
+            f"found {len(matches)}",
+            file=sys.stderr,
+        )
+        for match in matches:
+            print(f"  {match}", file=sys.stderr)
+        raise SystemExit(1)
+    return matches[0]
+
+
 def main() -> int:
     if len(sys.argv) != 3:
-        print("usage: run_install_smoke.py <source_root> <build_root>", file=sys.stderr)
+        print("usage: run_install_smoke.py <source_root> <build_root>",
+              file=sys.stderr)
         return 2
 
     source_root = pathlib.Path(sys.argv[1]).resolve()
@@ -30,13 +45,15 @@ def main() -> int:
         destdir = temp_path / "destdir"
         exe_path = temp_path / "install_smoke_consumer"
         consumer = source_root / "tests" / "install_smoke_consumer.c"
-        include_dir = destdir / "usr" / "local" / "include"
-        lib_path = destdir / "usr" / "local" / "lib" / "libarena.a"
 
         subprocess.run(
-            [meson, "install", "-C", str(build_root), "--destdir", str(destdir)],
+            [meson, "install", "-C", str(build_root), "--destdir",
+             str(destdir)],
             check=True,
         )
+
+        include_dir = find_single_path(destdir, "arena.h").parent
+        lib_path = find_single_path(destdir, "libarena.a")
 
         subprocess.run(
             [
