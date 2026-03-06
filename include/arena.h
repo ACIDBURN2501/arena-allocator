@@ -162,10 +162,92 @@ extern arena_status_t arena_alloc(arena_t *const arena, void **const result,
                                   size_t size, size_t alignment);
 
 /**
+ * @brief Allocate a zero-initialised block of memory from the arena.
+ *
+ * This is identical to @ref arena_alloc(), except the returned block is
+ * filled with zero bytes on success.
+ *
+ * @param[in,out] arena      Pointer to an already initialised arena (must not
+ *                           be NULL)
+ * @param[out]    result     Pointer to store the allocated memory address
+ * @param[in]     size       Number of bytes to allocate (must be > 0)
+ * @param[in]     alignment  Desired alignment in bytes (must be a power of two,
+ *                           0 means default alignment)
+ *
+ * @retval ARENA_STATUS_OK                Allocation succeeded; @p *result is
+ *                                       valid and points to zeroed memory.
+ * @retval ARENA_STATUS_NULL_POINTER      @p arena or @p result is NULL.
+ * @retval ARENA_STATUS_INVALID_ALIGNMENT @p alignment is non-zero and not a
+ *                                       power of two.
+ * @retval ARENA_STATUS_INVALID_ARGUMENT  @p size is zero.
+ * @retval ARENA_STATUS_OUT_OF_MEMORY     Insufficient contiguous space remains.
+ */
+extern arena_status_t arena_alloc_zero(arena_t *const arena,
+                                       void **const result, size_t size,
+                                       size_t alignment);
+
+/**
+ * @brief Allocate an array from the arena using element count semantics.
+ *
+ * This helper computes the total byte size as @p element_size * @p count and
+ * rejects overflow before delegating to @ref arena_alloc().
+ *
+ * @param[in,out] arena         Pointer to an already initialised arena
+ * @param[out]    result        Pointer to store the allocated memory address
+ * @param[in]     element_size  Size of each element in bytes (must be > 0)
+ * @param[in]     alignment     Desired alignment in bytes (must be a power of
+ *                              two, 0 means default alignment)
+ * @param[in]     count         Number of elements to allocate (must be > 0)
+ *
+ * @retval ARENA_STATUS_OK                Allocation succeeded.
+ * @retval ARENA_STATUS_NULL_POINTER      @p arena or @p result is NULL.
+ * @retval ARENA_STATUS_INVALID_ALIGNMENT @p alignment is non-zero and not a
+ *                                       power of two.
+ * @retval ARENA_STATUS_INVALID_ARGUMENT  @p element_size is zero, @p count is
+ *                                       zero, or @p element_size * @p count
+ *                                       would overflow @c size_t.
+ * @retval ARENA_STATUS_OUT_OF_MEMORY     Insufficient contiguous space remains.
+ */
+extern arena_status_t arena_alloc_array(arena_t *const arena,
+                                        void **const result,
+                                        size_t element_size, size_t alignment,
+                                        size_t count);
+
+/**
+ * @brief Allocate a zero-initialised array from the arena.
+ *
+ * This is identical to @ref arena_alloc_array(), except the returned block is
+ * filled with zero bytes on success.
+ *
+ * @param[in,out] arena         Pointer to an already initialised arena
+ * @param[out]    result        Pointer to store the allocated memory address
+ * @param[in]     element_size  Size of each element in bytes (must be > 0)
+ * @param[in]     alignment     Desired alignment in bytes (must be a power of
+ *                              two, 0 means default alignment)
+ * @param[in]     count         Number of elements to allocate (must be > 0)
+ *
+ * @retval ARENA_STATUS_OK                Allocation succeeded and memory is
+ *                                       zero-initialised.
+ * @retval ARENA_STATUS_NULL_POINTER      @p arena or @p result is NULL.
+ * @retval ARENA_STATUS_INVALID_ALIGNMENT @p alignment is non-zero and not a
+ *                                       power of two.
+ * @retval ARENA_STATUS_INVALID_ARGUMENT  @p element_size is zero, @p count is
+ *                                       zero, or @p element_size * @p count
+ *                                       would overflow @c size_t.
+ * @retval ARENA_STATUS_OUT_OF_MEMORY     Insufficient contiguous space remains.
+ */
+extern arena_status_t arena_alloc_array_zero(arena_t *const arena,
+                                             void **const result,
+                                             size_t element_size,
+                                             size_t alignment, size_t count);
+
+/**
  * @brief Store the current arena position for later rewinding.
  *
  * The returned marker can later be passed to arena_rewind() to restore the
- * arena to exactly this point.
+ * arena to exactly this point.  This is the recommended way to create
+ * function-scoped temporary allocations: save a marker on entry, allocate
+ * temporary working memory, then rewind before returning.
  *
  * @param[in] arena  Pointer to a valid arena (must not be NULL)
  *
@@ -246,6 +328,38 @@ extern size_t arena_get_high_water(const arena_t *const arena);
  * @pre arena != NULL
  */
 extern size_t arena_get_capacity(const arena_t *const arena);
+
+/**
+ * @brief Allocate one typed object and store the pointer in a typed variable.
+ *
+ * Pass the address of a typed pointer variable, for example
+ * `my_type_t *ptr = NULL;` followed by
+ * `ARENA_ALLOC_OBJECT(&arena, &ptr, my_type_t);`.
+ */
+#define ARENA_ALLOC_OBJECT(arena, result, type)                                \
+        arena_alloc((arena), (void **)(result), sizeof(type), _Alignof(type))
+
+/**
+ * @brief Allocate an array of typed objects and store the pointer.
+ */
+#define ARENA_ALLOC_ARRAY(arena, result, type, count)                          \
+        arena_alloc_array((arena), (void **)(result), sizeof(type),            \
+                          _Alignof(type), (count))
+
+/**
+ * @brief Allocate one zero-initialised typed object and store the pointer.
+ */
+#define ARENA_ALLOC_OBJECT_ZERO(arena, result, type)                           \
+        arena_alloc_zero((arena), (void **)(result), sizeof(type),             \
+                         _Alignof(type))
+
+/**
+ * @brief Allocate a zero-initialised array of typed objects and store the
+ * pointer.
+ */
+#define ARENA_ALLOC_ARRAY_ZERO(arena, result, type, count)                     \
+        arena_alloc_array_zero((arena), (void **)(result), sizeof(type),       \
+                               _Alignof(type), (count))
 
 /**
  * @}

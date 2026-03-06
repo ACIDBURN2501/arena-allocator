@@ -93,18 +93,37 @@ align_up(const uintptr_t address, const size_t alignment)
 static void
 arena_fill(void *const start, const size_t size, const uint8_t pattern)
 {
-#if (ARENA_CFG_DEBUG_POISON != 0)
         uint8_t *p = (uint8_t *)start;
         size_t i;
+
         for (i = 0U; i < size; ++i) {
                 p[i] = pattern;
         }
-#else
-        (void)start;
-        (void)size;
-        (void)pattern;
-        /* No operation in production builds */
-#endif
+}
+
+static arena_status_t
+arena_compute_total_size(void **const result, const size_t element_size,
+                         const size_t count, size_t *const total_size)
+{
+        if (result == NULL) {
+                return ARENA_STATUS_NULL_POINTER;
+        }
+        *result = NULL;
+
+        if (total_size == NULL) {
+                return ARENA_STATUS_NULL_POINTER;
+        }
+
+        if ((element_size == 0U) || (count == 0U)) {
+                return ARENA_STATUS_INVALID_ARGUMENT;
+        }
+
+        if (element_size > (SIZE_MAX / count)) {
+                return ARENA_STATUS_INVALID_ARGUMENT;
+        }
+
+        *total_size = element_size * count;
+        return ARENA_STATUS_OK;
 }
 
 /* ------------------------------------------------------------------ */
@@ -139,7 +158,9 @@ arena_init(arena_t *const arena, void *const buffer, const size_t size)
         arena->poison = ARENA_CFG_POISON_PATTERN;
 
         /* Optional fill with poison to catch use-after-reset in tests */
+#if (ARENA_CFG_DEBUG_POISON != 0)
         arena_fill(arena->start, size, ARENA_CFG_POISON_PATTERN);
+#endif
 
         return ARENA_STATUS_OK;
 }
@@ -204,6 +225,53 @@ arena_alloc(arena_t *const arena, void **const result, const size_t size,
 
         *result = (void *)(arena->start + aligned_offset);
         return ARENA_STATUS_OK;
+}
+
+arena_status_t
+arena_alloc_zero(arena_t *const arena, void **const result, const size_t size,
+                 const size_t alignment)
+{
+        arena_status_t st;
+
+        st = arena_alloc(arena, result, size, alignment);
+        if (st != ARENA_STATUS_OK) {
+                return st;
+        }
+
+        arena_fill(*result, size, 0U);
+        return ARENA_STATUS_OK;
+}
+
+arena_status_t
+arena_alloc_array(arena_t *const arena, void **const result,
+                  const size_t element_size, const size_t alignment,
+                  const size_t count)
+{
+        arena_status_t st;
+        size_t total_size;
+
+        st = arena_compute_total_size(result, element_size, count, &total_size);
+        if (st != ARENA_STATUS_OK) {
+                return st;
+        }
+
+        return arena_alloc(arena, result, total_size, alignment);
+}
+
+arena_status_t
+arena_alloc_array_zero(arena_t *const arena, void **const result,
+                       const size_t element_size, const size_t alignment,
+                       const size_t count)
+{
+        arena_status_t st;
+        size_t total_size;
+
+        st = arena_compute_total_size(result, element_size, count, &total_size);
+        if (st != ARENA_STATUS_OK) {
+                return st;
+        }
+
+        return arena_alloc_zero(arena, result, total_size, alignment);
 }
 
 arena_marker_t

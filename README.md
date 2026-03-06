@@ -10,6 +10,8 @@ A deterministic arena (bump) allocator in C for safety-critical embedded systems
 - **Deterministic allocation** — O(1) allocation with no branching or overhead.
 - **Checkpointing** — save and restore arena state with markers for scoped allocations.
 - **High-water tracking** — monitor maximum memory usage for static analysis.
+- **Typed helpers** — optional object/array wrappers remove repetitive size/alignment code.
+- **Zeroing helpers** — opt-in zero-initialised allocation for state that must start clean.
 - **MISRA C:2012 compliant** — suitable for IEC 61508 SIL 2/3 environments.
 - **Debug poisoning** — optional fill with known patterns to detect use-after-free.
 
@@ -50,7 +52,9 @@ int main(void)
 {
         static uint8_t buffer[1024];
         arena_t arena;
-        void *p1, *p2, *p3;
+        uint8_t *p1 = NULL;
+        uint32_t *p2 = NULL;
+        uint8_t *p3 = NULL;
         arena_status_t st;
         arena_marker_t marker;
 
@@ -61,8 +65,8 @@ int main(void)
         }
 
         /* Allocate memory */
-        st = arena_alloc(&arena, &p1, 100U, 0U);
-        st = arena_alloc(&arena, &p2, 200U, 16U);
+        st = arena_alloc(&arena, (void **)&p1, 100U, 0U);
+        st = ARENA_ALLOC_ARRAY(&arena, &p2, uint32_t, 50U);
 
         /* Save checkpoint */
         marker = arena_get_marker(&arena);
@@ -78,6 +82,48 @@ int main(void)
 
         return 0;
 }
+```
+
+## Scoped Temporary Allocations
+
+Markers let you use one arena as both permanent storage and function-scoped
+scratch memory.
+
+```c
+arena_status_t decode_packet(arena_t *const arena)
+{
+        arena_marker_t scratch;
+        uint8_t *workspace = NULL;
+        arena_status_t st;
+
+        scratch = arena_get_marker(arena);
+        if (scratch == ARENA_MARKER_INVALID) {
+                return ARENA_STATUS_NULL_POINTER;
+        }
+
+        st = arena_alloc(arena, (void **)&workspace, 64U, 4U);
+        if (st != ARENA_STATUS_OK) {
+                return st;
+        }
+
+        /* Use workspace for temporary parsing state. */
+
+        arena_rewind(arena, scratch);
+        return ARENA_STATUS_OK;
+}
+```
+
+## Typed Helpers
+
+The core byte-oriented API remains available, but the header also provides
+small typed wrappers for common cases.
+
+```c
+sample_t *sample = NULL;
+uint16_t *table = NULL;
+
+st = ARENA_ALLOC_OBJECT(&arena, &sample, sample_t);
+st = ARENA_ALLOC_ARRAY_ZERO(&arena, &table, uint16_t, 32U);
 ```
 
 ## Configuration
@@ -127,7 +173,7 @@ All functions that can fail return an `arena_status_t`:
 | `1` | `ARENA_STATUS_NULL_POINTER` | A required pointer argument was NULL |
 | `2` | `ARENA_STATUS_OUT_OF_MEMORY` | Not enough space left in the arena |
 | `3` | `ARENA_STATUS_INVALID_ALIGNMENT` | Alignment is non-zero and not a power of two |
-| `4` | `ARENA_STATUS_INVALID_ARGUMENT` | `size` or buffer length argument is zero |
+| `4` | `ARENA_STATUS_INVALID_ARGUMENT` | Zero size/count, or invalid byte-count computation |
 
 ### Initialization
 
@@ -143,6 +189,13 @@ arena's lifetime. Returns `ARENA_STATUS_INVALID_ARGUMENT` if `size` is zero,
 
 ```c
 arena_status_t arena_alloc(arena_t *arena, void **result, size_t size, size_t alignment);
+arena_status_t arena_alloc_zero(arena_t *arena, void **result, size_t size, size_t alignment);
+arena_status_t arena_alloc_array(arena_t *arena, void **result,
+                                 size_t element_size, size_t alignment,
+                                 size_t count);
+arena_status_t arena_alloc_array_zero(arena_t *arena, void **result,
+                                      size_t element_size, size_t alignment,
+                                      size_t count);
 ```
 
 Allocate `size` bytes with the requested alignment. Pass `alignment = 0` to use
@@ -150,7 +203,22 @@ the default (`ARENA_CFG_DEFAULT_ALIGNMENT`, 8 bytes). Returns
 `ARENA_STATUS_INVALID_ARGUMENT` if `size` is zero,
 `ARENA_STATUS_INVALID_ALIGNMENT` if `alignment` is non-zero and not a power of
 two, or `ARENA_STATUS_OUT_OF_MEMORY` if the arena is full. On failure,
-`*result` is set to `NULL`.
+`*result` is set to `NULL`. The array variants reject `count == 0`,
+`element_size == 0`, and any `element_size * count` overflow before
+attempting the allocation. The `_zero` variants additionally clear the
+allocated bytes.
+
+### Typed Macros
+
+```c
+#define ARENA_ALLOC_OBJECT(arena, result, type)
+#define ARENA_ALLOC_ARRAY(arena, result, type, count)
+#define ARENA_ALLOC_OBJECT_ZERO(arena, result, type)
+#define ARENA_ALLOC_ARRAY_ZERO(arena, result, type, count)
+```
+
+These wrappers infer `sizeof(type)` and `_Alignof(type)` for common object and
+array allocations.
 
 ### Checkpointing
 

@@ -5,10 +5,18 @@
 
 #include "test_arena.h"
 
+#include <string.h>
+
 static bool test_alignment_boundaries(void);
 static bool test_alloc_exact_capacity(void);
 static bool test_alignment_mask_correctness(void);
 static bool test_init_size_overflow(void);
+static bool test_zero_alloc_helpers(void);
+static bool test_typed_helper_macros(void);
+
+typedef struct {
+        _Alignas(16) uint8_t bytes[16];
+} aligned_block_t;
 
 static bool
 test_alignment_boundaries(void)
@@ -24,7 +32,8 @@ test_alignment_boundaries(void)
 
         st = arena_init(&arena, buffer, sizeof(buffer));
         if (st != ARENA_STATUS_OK) {
-                printf("FAIL: arena_init failed in test_alignment_boundaries\n");
+                printf(
+                    "FAIL: arena_init failed in test_alignment_boundaries\n");
                 return false;
         }
 
@@ -86,7 +95,8 @@ test_alloc_exact_capacity(void)
 
         st = arena_init(&arena, buffer, sizeof(buffer));
         if (st != ARENA_STATUS_OK) {
-                printf("FAIL: arena_init failed in test_alloc_exact_capacity\n");
+                printf(
+                    "FAIL: arena_init failed in test_alloc_exact_capacity\n");
                 return false;
         }
 
@@ -98,8 +108,9 @@ test_alloc_exact_capacity(void)
 
         st = arena_alloc(&arena, &ptr, 1U, 1U);
         if (st != ARENA_STATUS_OUT_OF_MEMORY) {
-                printf("FAIL: Expected OUT_OF_MEMORY after full alloc, got %d\n",
-                       st);
+                printf(
+                    "FAIL: Expected OUT_OF_MEMORY after full alloc, got %d\n",
+                    st);
                 passed = false;
         }
 
@@ -262,6 +273,117 @@ test_init_size_overflow(void)
         return passed;
 }
 
+static bool
+test_zero_alloc_helpers(void)
+{
+        static uint8_t buffer[DEMO_BUF_SIZE];
+        arena_t arena;
+        arena_status_t st;
+        uint8_t *bytes = NULL;
+        uint32_t *words = NULL;
+        bool passed = true;
+        size_t i;
+
+        memset(buffer, 0x5AU, sizeof(buffer));
+
+        st = arena_init(&arena, buffer, sizeof(buffer));
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: arena_init failed in test_zero_alloc_helpers\n");
+                return false;
+        }
+
+        st = arena_alloc_zero(&arena, (void **)&bytes, 12U, 4U);
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: arena_alloc_zero failed\n");
+                passed = false;
+        } else {
+                for (i = 0U; i < 12U; ++i) {
+                        if (bytes[i] != 0U) {
+                                printf("FAIL: arena_alloc_zero did not zero "
+                                       "byte %zu\n",
+                                       i);
+                                passed = false;
+                                break;
+                        }
+                }
+        }
+
+        st = ARENA_ALLOC_ARRAY_ZERO(&arena, &words, uint32_t, 4U);
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: ARENA_ALLOC_ARRAY_ZERO failed\n");
+                passed = false;
+        } else {
+                for (i = 0U; i < 4U; ++i) {
+                        if (words[i] != 0U) {
+                                printf(
+                                    "FAIL: ARENA_ALLOC_ARRAY_ZERO did not zero "
+                                    "element %zu\n",
+                                    i);
+                                passed = false;
+                                break;
+                        }
+                }
+        }
+
+        if (passed) {
+                printf("PASS: test_zero_alloc_helpers\n");
+        }
+        return passed;
+}
+
+static bool
+test_typed_helper_macros(void)
+{
+        static uint8_t buffer[DEMO_BUF_SIZE];
+        arena_t arena;
+        arena_status_t st;
+        aligned_block_t *block = NULL;
+        uint16_t *values = NULL;
+        uint16_t *overflow_values = (uint16_t *)buffer;
+        bool passed = true;
+        const size_t overflow_count =
+            (SIZE_MAX / sizeof(*overflow_values)) + 1U;
+
+        st = arena_init(&arena, buffer, sizeof(buffer));
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: arena_init failed in test_typed_helper_macros\n");
+                return false;
+        }
+
+        st = ARENA_ALLOC_OBJECT(&arena, &block, aligned_block_t);
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: ARENA_ALLOC_OBJECT failed\n");
+                passed = false;
+        } else if (((uintptr_t)block & (_Alignof(aligned_block_t) - 1U))
+                   != 0U) {
+                printf("FAIL: ARENA_ALLOC_OBJECT result misaligned\n");
+                passed = false;
+        }
+
+        st = ARENA_ALLOC_ARRAY(&arena, &values, uint16_t, 6U);
+        if (st != ARENA_STATUS_OK) {
+                printf("FAIL: ARENA_ALLOC_ARRAY failed\n");
+                passed = false;
+        } else if (((uintptr_t)values & (_Alignof(uint16_t) - 1U)) != 0U) {
+                printf("FAIL: ARENA_ALLOC_ARRAY result misaligned\n");
+                passed = false;
+        }
+
+        st = ARENA_ALLOC_ARRAY(&arena, &overflow_values, uint16_t,
+                               overflow_count);
+        if ((st != ARENA_STATUS_INVALID_ARGUMENT)
+            || (overflow_values != NULL)) {
+                printf(
+                    "FAIL: ARENA_ALLOC_ARRAY overflow did not fail cleanly\n");
+                passed = false;
+        }
+
+        if (passed) {
+                printf("PASS: test_typed_helper_macros\n");
+        }
+        return passed;
+}
+
 bool
 run_allocation_tests(void)
 {
@@ -271,6 +393,8 @@ run_allocation_tests(void)
         all_passed = test_alloc_exact_capacity() && all_passed;
         all_passed = test_alignment_mask_correctness() && all_passed;
         all_passed = test_init_size_overflow() && all_passed;
+        all_passed = test_zero_alloc_helpers() && all_passed;
+        all_passed = test_typed_helper_macros() && all_passed;
 
         return all_passed;
 }
