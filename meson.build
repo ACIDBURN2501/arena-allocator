@@ -1,7 +1,7 @@
 project(
   'arena-allocator',
   'c',
-  version: '1.1.5',
+  version: '1.1.6',
   default_options: ['warning_level=3'],
 )
 

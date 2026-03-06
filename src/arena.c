@@ -256,7 +256,10 @@ arena_rewind(arena_t *const arena, const arena_marker_t marker)
                 arena->current = arena->start + marker;
 
 #if (ARENA_CFG_DEBUG_POISON != 0)
-                /* Poison the released area to detect stray accesses */
+                /* Poison the entire free tail [current, end).  This is
+                 * intentional: after rewind, only [start, current) remains
+                 * live, so keeping all free space poisoned helps detect
+                 * stale accesses without affecting valid allocations. */
                 arena_fill(arena->current,
                            (size_t)(arena->end - arena->current),
                            arena->poison);
