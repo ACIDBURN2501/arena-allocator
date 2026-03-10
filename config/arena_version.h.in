@@ -1,0 +1,14 @@
+/**
+ * @file arena_version.h
+ * @brief Auto-generated version information.  Do not edit by hand.
+ */
+
+#ifndef ARENA_VERSION_H
+#define ARENA_VERSION_H
+
+#define ARENA_VERSION       "@ARENA_VERSION@"
+#define ARENA_VERSION_MAJOR @ARENA_VERSION_MAJOR @
+#define ARENA_VERSION_MINOR @ARENA_VERSION_MINOR @
+#define ARENA_VERSION_PATCH @ARENA_VERSION_PATCH @
+
+#endif /* ARENA_VERSION_H */
