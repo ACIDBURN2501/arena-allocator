@@ -1,6 +1,10 @@
 /**
- * @file arena_version.h
- * @brief Auto-generated version information.  Do not edit by hand.
+ * SPDX-License-Identifier: MIT
+ *
+ * @file: arena_version.h
+ *
+ * @brief
+ *    Auto-generated version information. Do not edit by hand.
  */
 
 #ifndef ARENA_VERSION_H

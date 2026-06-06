@@ -1,6 +1,10 @@
-/*********************************************************************
- * @file arena_cfg.h
- * @brief Public compile-time configuration for the deterministic arena.
+/**
+ * SPDX-License-Identifier: MIT
+ *
+ * @file: arena_cfg.h
+ *
+ * @brief
+ *    Public compile-time configuration for the deterministic arena.
  *
  * The values defined here can be overridden on the compiler command line
  * (e.g. -DARENA_CFG_DEFAULT_ALIGNMENT=16).

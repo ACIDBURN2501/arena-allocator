@@ -1,6 +1,6 @@
 # arena-allocator
 
-[![CI](https://github.com/ACIDBURN2501/arena-allocator/actions/workflows/ci.yml/badge.svg)](https://github.com/ACIDBURN2501/arena-allocator/actions/workflows/ci.yml)
+[![CI](https://github.com/aajll/arena-allocator/actions/workflows/ci.yml/badge.svg)](https://github.com/aajll/arena-allocator/actions/workflows/ci.yml)
 
 A deterministic arena (bump) allocator in C for safety-critical embedded systems.
 
@@ -58,7 +58,7 @@ int main(void)
         arena_status_t st;
         arena_marker_t marker;
 
-        /* Initialize arena */
+        /* Initialise arena */
         st = arena_init(&arena, buffer, sizeof(buffer));
         if (st != ARENA_STATUS_OK) {
                 return -1;
@@ -175,13 +175,13 @@ All functions that can fail return an `arena_status_t`:
 | `3` | `ARENA_STATUS_INVALID_ALIGNMENT` | Alignment is non-zero and not a power of two |
 | `4` | `ARENA_STATUS_INVALID_ARGUMENT` | Zero size/count, or invalid byte-count computation |
 
-### Initialization
+### Initialisation
 
 ```c
 arena_status_t arena_init(arena_t *arena, void *buffer, size_t size);
 ```
 
-Initialize an arena with a backing buffer. The buffer must remain valid for the
+Initialise an arena with a backing buffer. The buffer must remain valid for the
 arena's lifetime. Returns `ARENA_STATUS_INVALID_ARGUMENT` if `size` is zero,
 `ARENA_STATUS_NULL_POINTER` if either pointer is NULL.
 

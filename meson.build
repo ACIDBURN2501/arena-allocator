@@ -16,6 +16,8 @@ version_h = configure_file(
   input: 'config' / 'arena_version.h.in',
   output: 'arena_version.h',
   configuration: _conf,
+  install: true,
+  install_dir: get_option('includedir') / 'arena',
 )
 
 arena_inc = include_directories('include', 'config')
@@ -31,6 +33,18 @@ arena_lib = static_library(
 arena_dep = declare_dependency(include_directories: arena_inc, link_with: arena_lib)
 
 install_headers('include/arena.h', 'include/arena_cfg.h')
+
+# === pkg-config ===============================================================
+
+pkgconfig = import('pkgconfig')
+pkgconfig.generate(
+  arena_lib,
+  name: 'arena',
+  description: 'Deterministic arena (bump) allocator in C for safety-critical embedded systems',
+  subdirs: 'arena',
+)
+
+# === Host unit tests ==========================================================
 
 if get_option('build_tests')
   subdir('tests')

@@ -21,6 +21,10 @@ poison_test_exe = executable('test_arena_poison',
 
 test('arena_test', test_exe)
 test('arena_poison_test', poison_test_exe)
-test('arena_install_smoke', python,
-     args : [files('run_install_smoke.py'), meson.project_source_root(),
-             meson.project_build_root()])
+
+# The smoke test installs libarena.a and links it from a plain consumer that carries no sanitizer or coverage flags. Instrumented static archives embed sanitizer/gcov runtime symbols that the consumer linker cannot resolve, so the install-smoke test only runs for plain builds.
+if get_option('b_sanitize') == 'none' and not get_option('b_coverage')
+  test('arena_install_smoke', python,
+       args : [files('run_install_smoke.py'), meson.project_source_root(),
+               meson.project_build_root()])
+endif
