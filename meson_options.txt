@@ -1,6 +1,6 @@
 option(
-        'build_tests',
-        type        : 'boolean',
-        value       : false,
-        description : 'Build the unit test suite',
+  'build_tests',
+  type: 'boolean',
+  value: false,
+  description: 'Build the unit test suite',
 )

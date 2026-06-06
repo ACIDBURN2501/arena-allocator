@@ -1,6 +1,10 @@
-/*********************************************************************
- * @file arena.c
- * @brief Implementation of the deterministic arena allocator.
+/**
+ * SPDX-License-Identifier: MIT
+ *
+ * @file: arena.c
+ *
+ * @brief
+ *    Implementation of the deterministic arena allocator.
  *
  * All public functions are defined here, all internal helpers are
  * static (translation unit local).  The code follows MISRA C:2012

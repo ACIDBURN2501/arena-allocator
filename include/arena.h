@@ -1,6 +1,10 @@
-/*********************************************************************
- * @file arena.h
- * @brief Deterministic arena (bump) allocator.
+/**
+ * SPDX-License-Identifier: MIT
+ *
+ * @file: arena.h
+ *
+ * @brief
+ *    Deterministic arena (bump) allocator.
  *
  * This allocator gives you a *static* memory pool that can be used in a
  * safety critical environment.  Allocation is O(1) and never fails
