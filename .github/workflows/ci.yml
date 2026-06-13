@@ -45,10 +45,16 @@ jobs:
         run: meson compile -C build
 
       - name: Verify poison and install smoke tests are registered
+        # The install-smoke test is intentionally gated out of sanitizer and
+        # coverage builds (instrumented archives embed runtime symbols the
+        # plain consumer cannot resolve), so it is absent from the sanitized
+        # `build` above. Verify registration against a throwaway plain build
+        # where both tests are expected to appear.
         run: >
+          meson setup build-listcheck --buildtype=debug -Dbuild_tests=true &&
           python -c
           "import subprocess, sys;
-          out = subprocess.check_output(['meson', 'test', '-C', 'build', '--list'], text=True);
+          out = subprocess.check_output(['meson', 'test', '-C', 'build-listcheck', '--list'], text=True);
           print(out, end='');
           required = ('arena_poison_test', 'arena_install_smoke');
           sys.exit(0 if all(name in out for name in required) else 1)"
